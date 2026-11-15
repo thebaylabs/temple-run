@@ -28,7 +28,7 @@
             image-rendering: -webkit-crisp-edges;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
-            box-shadow: 0 0 35px rgba(0, 0, 0, 0.85);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
             border-radius: 4px;
         }
     </style>
@@ -36,11 +36,14 @@
 <body>
     <canvas id="gameCanvas"></canvas>
 
-    <!-- Game Engine Scripts (Strict order) -->
+    <!-- Game Engine Scripts (Strict Dependency Order) -->
     <script src="js/config.js"></script>
     <script src="js/audio.js"></script>
     <script src="js/particles.js"></script>
+    <script src="js/assets.js"></script>
     <script src="js/input.js"></script>
+    <script src="js/obstacles.js"></script>
+    <script src="js/demon.js"></script>
     <script src="js/background.js"></script>
     <script src="js/player.js"></script>
     <script src="js/choices.js"></script>

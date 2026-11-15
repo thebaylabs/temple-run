@@ -1,153 +1,153 @@
 // ============================================================
 // BACKGROUND — Sky, ground, zone decorations, parallax, temple
+// V1: 960×540 canvas, terrain slopes, temple stairs, demon bar, warning pulse
 // ============================================================
 const Background = (() => {
     let animTick = 0;
 
-    // ---- Small drawing helpers ----
+    // ---- Small drawing helpers (all coords 2× V0) ----
 
     function drawBush(ctx, x, y, color) {
         ctx.fillStyle = color || '#2D6A1E';
-        ctx.fillRect(x, y - 14, 18, 14);
-        ctx.fillRect(x + 3, y - 18, 12, 4);
-        ctx.fillRect(x + 5, y - 20, 8, 2);
+        ctx.fillRect(x, y - 28, 36, 28);
+        ctx.fillRect(x + 6, y - 36, 24, 8);
+        ctx.fillRect(x + 10, y - 40, 16, 4);
         ctx.fillStyle = shadeColor(color || '#2D6A1E', -25);
-        ctx.fillRect(x + 2, y - 8, 7, 8);
+        ctx.fillRect(x + 4, y - 16, 14, 16);
     }
 
     function drawTree(ctx, x, y, leafColor) {
         ctx.fillStyle = '#6B4226';
-        ctx.fillRect(x + 8, y - 35, 6, 35);
+        ctx.fillRect(x + 16, y - 70, 12, 70);
         ctx.fillStyle = leafColor || '#2D6A1E';
-        ctx.fillRect(x, y - 55, 22, 22);
-        ctx.fillRect(x + 3, y - 60, 16, 5);
-        ctx.fillRect(x - 2, y - 48, 26, 8);
+        ctx.fillRect(x, y - 110, 44, 44);
+        ctx.fillRect(x + 6, y - 120, 32, 10);
+        ctx.fillRect(x - 4, y - 96, 52, 16);
         ctx.fillStyle = shadeColor(leafColor || '#2D6A1E', -15);
-        ctx.fillRect(x + 2, y - 42, 10, 10);
+        ctx.fillRect(x + 4, y - 84, 20, 20);
     }
 
     function drawFlower(ctx, x, y, color) {
         ctx.fillStyle = '#2A6A1E';
-        ctx.fillRect(x + 1, y - 7, 2, 7);
+        ctx.fillRect(x + 2, y - 14, 4, 14);
         ctx.fillStyle = color;
-        ctx.fillRect(x - 1, y - 11, 6, 5);
+        ctx.fillRect(x - 2, y - 22, 12, 10);
         ctx.fillStyle = '#FFD700';
-        ctx.fillRect(x + 1, y - 10, 2, 2);
+        ctx.fillRect(x + 2, y - 20, 4, 4);
     }
 
     function drawPillar(ctx, x, y) {
         ctx.fillStyle = '#D4B896';
-        ctx.fillRect(x, y - 72, 14, 72);
+        ctx.fillRect(x, y - 144, 28, 144);
         ctx.fillStyle = '#E8D0B0';
-        ctx.fillRect(x - 3, y - 78, 20, 8);
-        ctx.fillRect(x - 1, y - 81, 16, 3);
+        ctx.fillRect(x - 6, y - 156, 40, 16);
+        ctx.fillRect(x - 2, y - 162, 32, 6);
         ctx.fillStyle = '#C4A080';
-        ctx.fillRect(x - 2, y - 4, 18, 6);
+        ctx.fillRect(x - 4, y - 8, 36, 12);
         ctx.fillStyle = '#B49070';
-        ctx.fillRect(x + 4, y - 64, 2, 52);
-        ctx.fillRect(x + 8, y - 64, 2, 52);
+        ctx.fillRect(x + 8, y - 128, 4, 104);
+        ctx.fillRect(x + 16, y - 128, 4, 104);
     }
 
     function drawFountain(ctx, x, y) {
         ctx.fillStyle = '#4AA8D8';
-        ctx.fillRect(x - 8, y - 8, 36, 8);
+        ctx.fillRect(x - 16, y - 16, 72, 16);
         ctx.fillStyle = '#A0A0A0';
-        ctx.fillRect(x - 10, y - 10, 40, 3);
-        ctx.fillRect(x - 10, y - 1, 40, 3);
+        ctx.fillRect(x - 20, y - 20, 80, 6);
+        ctx.fillRect(x - 20, y - 2, 80, 6);
         ctx.fillStyle = '#B0B0B0';
-        ctx.fillRect(x + 7, y - 28, 6, 20);
+        ctx.fillRect(x + 14, y - 56, 12, 40);
         ctx.fillStyle = '#88D8F8';
-        ctx.fillRect(x + 8, y - 33, 4, 5);
-        ctx.fillRect(x + 5, y - 36, 2, 3);
-        ctx.fillRect(x + 13, y - 36, 2, 3);
-        ctx.fillRect(x + 3, y - 30, 2, 2);
-        ctx.fillRect(x + 15, y - 30, 2, 2);
-
-        // Water ripple animation
-        const wave = Math.sin(animTick * 0.15 + x) * 2;
+        ctx.fillRect(x + 16, y - 66, 8, 10);
+        ctx.fillRect(x + 10, y - 72, 4, 6);
+        ctx.fillRect(x + 26, y - 72, 4, 6);
+        ctx.fillRect(x + 6, y - 60, 4, 4);
+        ctx.fillRect(x + 30, y - 60, 4, 4);
+        const wave = Math.sin(animTick * 0.15 + x * 0.01) * 4;
         ctx.fillStyle = '#E0F7FA';
-        ctx.fillRect(x - 4 + wave, y - 5, 8, 1);
+        ctx.fillRect(x - 8 + wave, y - 10, 16, 2);
     }
 
     function drawTemple(ctx, x, y) {
-        const w = 140, h = 105;
-        // Steps
+        const w = 280, h = 210;
+
+        // Base steps
         ctx.fillStyle = '#E8D0B0';
-        ctx.fillRect(x - 15, y - 15, w + 30, 15);
-        ctx.fillRect(x - 10, y - 22, w + 20, 7);
-        ctx.fillRect(x - 5, y - 28, w + 10, 6);
-        ctx.fillRect(x, y - 32, w, 4);
+        ctx.fillRect(x - 30, y - 30, w + 60, 30);
+        ctx.fillRect(x - 20, y - 44, w + 40, 14);
+        ctx.fillRect(x - 10, y - 56, w + 20, 12);
+        ctx.fillRect(x, y - 64, w, 8);
 
         // Diyas on steps
-        for (let i = 0; i < 4; i++) {
-            const dx = x - 5 + i * 36;
+        for (let i = 0; i < 8; i++) {
+            const dx = x - 10 + i * 36;
             ctx.fillStyle = '#B45309';
-            ctx.fillRect(dx, y - 18, 5, 3);
+            ctx.fillRect(dx, y - 36, 10, 6);
             ctx.fillStyle = '#F59E0B';
-            ctx.fillRect(dx + 1, y - 21, 3, 3);
+            ctx.fillRect(dx + 2, y - 42, 6, 6);
             ctx.fillStyle = '#FFF';
-            ctx.fillRect(dx + 2, y - 20, 1, 1);
+            ctx.fillRect(dx + 4, y - 40, 2, 2);
         }
 
         // Main body
         ctx.fillStyle = '#D4B896';
-        ctx.fillRect(x + 10, y - 72, w - 20, 40);
+        ctx.fillRect(x + 20, y - 144, w - 40, 80);
 
         // Entrance arch
         ctx.fillStyle = '#3E2723';
-        ctx.fillRect(x + 54, y - 62, 28, 30);
+        ctx.fillRect(x + 108, y - 124, 56, 60);
         ctx.fillStyle = '#8D6E63';
-        ctx.fillRect(x + 54, y - 65, 28, 4);
+        ctx.fillRect(x + 108, y - 130, 56, 8);
 
         // Golden murti glow inside entrance
         const glowPulse = 0.5 + 0.5 * Math.sin(animTick * 0.1);
         ctx.fillStyle = `rgba(255, 215, 0, ${0.4 + 0.3 * glowPulse})`;
-        ctx.fillRect(x + 64, y - 52, 8, 16);
+        ctx.fillRect(x + 128, y - 104, 16, 32);
 
         // Main dome (Shikhara)
         ctx.fillStyle = '#E8C898';
-        ctx.fillRect(x + 35, y - 88, 66, 16);
-        ctx.fillRect(x + 41, y - 96, 54, 8);
-        ctx.fillRect(x + 47, y - 102, 42, 6);
-        ctx.fillRect(x + 53, y - 107, 30, 5);
-        ctx.fillRect(x + 59, y - 111, 18, 4);
+        ctx.fillRect(x + 70, y - 176, 132, 32);
+        ctx.fillRect(x + 82, y - 192, 108, 16);
+        ctx.fillRect(x + 94, y - 204, 84, 12);
+        ctx.fillRect(x + 106, y - 214, 60, 10);
+        ctx.fillRect(x + 118, y - 222, 36, 8);
 
         // Side towers
         ctx.fillStyle = '#D4B090';
-        ctx.fillRect(x + 5, y - 84, 18, 52);
-        ctx.fillRect(x + w - 23, y - 84, 18, 52);
+        ctx.fillRect(x + 10, y - 168, 36, 104);
+        ctx.fillRect(x + w - 46, y - 168, 36, 104);
 
         // Side domes
         ctx.fillStyle = '#E8C898';
-        ctx.fillRect(x + 3, y - 92, 22, 8);
-        ctx.fillRect(x + 6, y - 97, 16, 5);
-        ctx.fillRect(x + w - 25, y - 92, 22, 8);
-        ctx.fillRect(x + w - 22, y - 97, 16, 5);
+        ctx.fillRect(x + 6, y - 184, 44, 16);
+        ctx.fillRect(x + 12, y - 194, 32, 10);
+        ctx.fillRect(x + w - 50, y - 184, 44, 16);
+        ctx.fillRect(x + w - 44, y - 194, 32, 10);
 
         // Golden Kalash & Spires
         ctx.fillStyle = '#FFD700';
-        ctx.fillRect(x + 66, y - 119, 4, 10);
-        ctx.fillRect(x + 67, y - 123, 2, 4);
-        ctx.fillRect(x + 13, y - 103, 4, 8);
-        ctx.fillRect(x + w - 17, y - 103, 4, 8);
+        ctx.fillRect(x + 132, y - 238, 8, 20);
+        ctx.fillRect(x + 134, y - 246, 4, 8);
+        ctx.fillRect(x + 26, y - 206, 8, 16);
+        ctx.fillRect(x + w - 34, y - 206, 8, 16);
 
         // Pillars in front of entrance
         ctx.fillStyle = '#C4A880';
         for (let i = 0; i < 4; i++) {
-            ctx.fillRect(x + 22 + i * 28, y - 68, 5, 36);
+            ctx.fillRect(x + 44 + i * 56, y - 136, 10, 72);
         }
 
         // Gold trim
         ctx.fillStyle = '#FFD700';
-        ctx.fillRect(x + 10, y - 72, w - 20, 2);
+        ctx.fillRect(x + 20, y - 144, w - 40, 4);
 
         // Fluttering Saffron Dharmadhwaja (Flag)
-        const flagWave = Math.round(Math.sin(animTick * 0.2) * 2);
+        const flagWave = Math.round(Math.sin(animTick * 0.2) * 4);
         ctx.fillStyle = '#666';
-        ctx.fillRect(x + 68, y - 132, 2, 12);
+        ctx.fillRect(x + 136, y - 264, 4, 24);
         ctx.fillStyle = '#FF6B00';
-        ctx.fillRect(x + 70, y - 132 + flagWave, 12, 6);
-        ctx.fillRect(x + 70, y - 129 + flagWave, 8, 4);
+        ctx.fillRect(x + 140, y - 264 + flagWave, 24, 12);
+        ctx.fillRect(x + 140, y - 258 + flagWave, 16, 8);
     }
 
     function shadeColor(hex, amt) {
@@ -174,17 +174,17 @@ const Background = (() => {
     function renderClouds(ctx, cameraX) {
         ctx.fillStyle = 'rgba(255,255,255,0.48)';
         const offset = cameraX * 0.12 + animTick * 0.08;
-        const spacing = 140;
+        const spacing = 280;
         const start = Math.floor(offset / spacing) - 1;
         for (let i = start; i < start + 7; i++) {
-            const bx = i * spacing + ((i * 73) % 40) - 20;
+            const bx = i * spacing + ((i * 73) % 80) - 40;
             const sx = bx - offset;
-            if (sx < -50 || sx > CONFIG.WIDTH + 10) continue;
-            const cy = 12 + ((i * 37 + 11) % 45);
-            const w = 22 + ((i * 53) % 18);
-            ctx.fillRect(sx, cy, w, 6);
-            ctx.fillRect(sx + 4, cy - 3, w - 8, 4);
-            ctx.fillRect(sx + 2, cy + 5, w - 4, 3);
+            if (sx < -100 || sx > CONFIG.WIDTH + 20) continue;
+            const cy = 24 + ((i * 37 + 11) % 90);
+            const w = 44 + ((i * 53) % 36);
+            ctx.fillRect(sx, cy, w, 12);
+            ctx.fillRect(sx + 8, cy - 6, w - 16, 8);
+            ctx.fillRect(sx + 4, cy + 10, w - 8, 6);
         }
     }
 
@@ -192,195 +192,237 @@ const Background = (() => {
         const parallax = 0.2;
         const offset = cameraX * parallax;
         ctx.fillStyle = 'rgba(160,140,110,0.22)';
-        const spacing = 280;
+        const spacing = 560;
         const start = Math.floor(offset / spacing) - 1;
         for (let i = start; i < start + 5; i++) {
-            const bx = i * spacing + 80;
+            const bx = i * spacing + 160;
             const sx = bx - offset;
-            if (sx < -70 || sx > CONFIG.WIDTH + 40) continue;
-            const h = 28 + ((i * 47 + 7) % 22);
-            const dy = CONFIG.GROUND_Y - 25;
-            ctx.fillRect(sx, dy - h, 28, h);
-            ctx.fillRect(sx + 4, dy - h - 7, 20, 7);
-            ctx.fillRect(sx + 7, dy - h - 13, 14, 6);
-            ctx.fillRect(sx + 10, dy - h - 17, 8, 4);
+            if (sx < -140 || sx > CONFIG.WIDTH + 80) continue;
+            const h = 56 + ((i * 47 + 7) % 44);
+            const dy = CONFIG.GROUND_Y - 50;
+            ctx.fillRect(sx, dy - h, 56, h);
+            ctx.fillRect(sx + 8, dy - h - 14, 40, 14);
+            ctx.fillRect(sx + 14, dy - h - 26, 28, 12);
+            ctx.fillRect(sx + 20, dy - h - 34, 16, 8);
             if (i % 2 === 0) {
-                ctx.fillRect(sx + 34, dy - h + 10, 14, h - 10);
-                ctx.fillRect(sx + 36, dy - h + 4, 10, 6);
+                ctx.fillRect(sx + 68, dy - h + 20, 28, h - 20);
+                ctx.fillRect(sx + 72, dy - h + 8, 20, 12);
             }
         }
     }
 
+    // Terrain-aware ground rendering with pixel-art slopes
     function renderGround(ctx, cameraX) {
-        for (let z = 0; z < CONFIG.ZONES.length; z++) {
-            const zone = CONFIG.ZONES[z];
-            const sl = Math.max(0, zone.start - cameraX);
-            const sr = Math.min(CONFIG.WIDTH, zone.end - cameraX);
-            if (sr <= 0 || sl >= CONFIG.WIDTH) continue;
-            const dx = Math.floor(sl), dw = Math.ceil(sr) - dx;
-            if (dw <= 0) continue;
+        // Determine terrain offset at a given worldX using CONFIG.getGroundY
+        // We draw the ground surface pixel-by-pixel at correct height
+        const GY = CONFIG.GROUND_Y;
+        const HT = CONFIG.HEIGHT;
 
+        // Draw per-pixel terrain columns for smooth slope visual
+        // For performance, we step by 2px
+        const step = 2;
+        const left = Math.floor(cameraX);
+        const right = Math.ceil(cameraX + CONFIG.WIDTH) + step;
+
+        for (let wx = left; wx < right; wx += step) {
+            const sx = wx - cameraX;
+            if (sx > CONFIG.WIDTH) break;
+            const groundY = (typeof CONFIG.getGroundY === 'function') ? CONFIG.getGroundY(wx) : GY;
+            const zi = CONFIG.getZoneIndex(wx);
+            const zone = CONFIG.ZONES[zi];
+            const drawW = step + 1; // slight overlap to avoid gaps
+
+            // Ground fill below surface
             ctx.fillStyle = zone.ground;
-            ctx.fillRect(dx, CONFIG.GROUND_Y, dw, CONFIG.HEIGHT - CONFIG.GROUND_Y);
+            ctx.fillRect(sx, groundY, drawW, HT - groundY);
+
+            // Ground dark top edge
             ctx.fillStyle = zone.groundDark;
-            ctx.fillRect(dx, CONFIG.GROUND_Y, dw, 3);
+            ctx.fillRect(sx, groundY, drawW, 6);
+
+            // Path strip
             ctx.fillStyle = zone.path;
-            ctx.fillRect(dx, CONFIG.GROUND_Y + 10, dw, 18);
+            ctx.fillRect(sx, groundY + 20, drawW, 36);
             ctx.fillStyle = zone.pathDark;
-            ctx.fillRect(dx, CONFIG.GROUND_Y + 9, dw, 2);
-            ctx.fillRect(dx, CONFIG.GROUND_Y + 27, dw, 2);
+            ctx.fillRect(sx, groundY + 18, drawW, 4);
+            ctx.fillRect(sx, groundY + 54, drawW, 4);
         }
 
-        if (cameraX < 0) {
-            const zone = CONFIG.ZONES[0];
-            ctx.fillStyle = zone.ground;
-            ctx.fillRect(0, CONFIG.GROUND_Y, Math.ceil(-cameraX), CONFIG.HEIGHT - CONFIG.GROUND_Y);
-            ctx.fillStyle = zone.groundDark;
-            ctx.fillRect(0, CONFIG.GROUND_Y, Math.ceil(-cameraX), 3);
-            ctx.fillStyle = zone.path;
-            ctx.fillRect(0, CONFIG.GROUND_Y + 10, Math.ceil(-cameraX), 18);
-            ctx.fillStyle = zone.pathDark;
-            ctx.fillRect(0, CONFIG.GROUND_Y + 9, Math.ceil(-cameraX), 2);
-            ctx.fillRect(0, CONFIG.GROUND_Y + 27, Math.ceil(-cameraX), 2);
-        }
-
-        // Stepping stone tiles
+        // Stepping stone tiles on path
         ctx.fillStyle = 'rgba(255,255,255,0.18)';
-        const ds = Math.floor(cameraX / 20) * 20;
-        for (let wx = ds; wx < cameraX + CONFIG.WIDTH; wx += 20) {
-            ctx.fillRect(wx - cameraX, CONFIG.GROUND_Y + 18, 10, 2);
+        const ds = Math.floor(cameraX / 40) * 40;
+        for (let wx = ds; wx < cameraX + CONFIG.WIDTH; wx += 40) {
+            const groundY = (typeof CONFIG.getGroundY === 'function') ? CONFIG.getGroundY(wx) : GY;
+            ctx.fillRect(wx - cameraX, groundY + 36, 20, 4);
         }
     }
 
     function renderDecorations(ctx, cameraX) {
-        const left = Math.floor(cameraX / 40) * 40 - 80;
-        const right = cameraX + CONFIG.WIDTH + 80;
+        const left = Math.floor(cameraX / 80) * 80 - 160;
+        const right = cameraX + CONFIG.WIDTH + 160;
 
-        for (let wx = left; wx < right; wx += 40) {
-            if (wx < -40) continue;
+        for (let wx = left; wx < right; wx += 80) {
+            if (wx < -80) continue;
             const zi = CONFIG.getZoneIndex(wx);
             const zone = CONFIG.ZONES[zi];
             const sx = wx - cameraX;
+            const groundY = (typeof CONFIG.getGroundY === 'function') ? CONFIG.getGroundY(wx) : CONFIG.GROUND_Y;
 
             switch (zi) {
                 case 0: // Garden Gate
-                    if (wx >= 0 && wx % 120 === 0) drawBush(ctx, sx + 5, CONFIG.GROUND_Y, zone.treeColor);
-                    if (wx >= 0 && wx % 80 === 0) {
-                        const fc = zone.flowerColors[Math.abs(wx / 80) % zone.flowerColors.length];
-                        drawFlower(ctx, sx + 16, CONFIG.GROUND_Y + 6, fc);
-                        drawFlower(ctx, sx + 26, CONFIG.GROUND_Y + 7, zone.flowerColors[(Math.abs(wx / 80) + 2) % zone.flowerColors.length]);
+                    if (wx >= 0 && wx % 240 === 0) drawBush(ctx, sx + 10, groundY, zone.treeColor);
+                    if (wx >= 0 && wx % 160 === 0) {
+                        const fc = zone.flowerColors[Math.abs(wx / 160) % zone.flowerColors.length];
+                        drawFlower(ctx, sx + 32, groundY + 12, fc);
+                        drawFlower(ctx, sx + 52, groundY + 14, zone.flowerColors[(Math.abs(wx / 160) + 2) % zone.flowerColors.length]);
                     }
-                    if (wx >= 0 && wx % 240 === 0) drawTree(ctx, sx, CONFIG.GROUND_Y, zone.treeColor);
+                    if (wx >= 0 && wx % 480 === 0) drawTree(ctx, sx, groundY, zone.treeColor);
                     break;
 
                 case 1: // Flower Gardens
-                    if (wx % 60 === 0) {
-                        const fc = zone.flowerColors[Math.abs(wx / 60) % zone.flowerColors.length];
-                        for (let f = 0; f < 4; f++) drawFlower(ctx, sx + f * 8 + 2, CONFIG.GROUND_Y + 4 + (f % 2), fc);
+                    if (wx % 120 === 0) {
+                        const fc = zone.flowerColors[Math.abs(wx / 120) % zone.flowerColors.length];
+                        for (let f = 0; f < 4; f++) drawFlower(ctx, sx + f * 16 + 4, groundY + 8 + (f % 2) * 2, fc);
                     }
-                    if (wx % 200 === 0) {
+                    if (wx % 400 === 0) {
                         ctx.fillStyle = zone.treeColor;
-                        ctx.fillRect(sx + 2, CONFIG.GROUND_Y - 22, 16, 22);
-                        ctx.fillRect(sx + 5, CONFIG.GROUND_Y - 28, 10, 6);
-                        ctx.fillRect(sx + 7, CONFIG.GROUND_Y - 31, 6, 3);
+                        ctx.fillRect(sx + 4, groundY - 44, 32, 44);
+                        ctx.fillRect(sx + 10, groundY - 56, 20, 12);
+                        ctx.fillRect(sx + 14, groundY - 62, 12, 6);
                     }
-                    if (wx % 280 === 0) drawTree(ctx, sx + 10, CONFIG.GROUND_Y, zone.treeColor);
+                    if (wx % 560 === 0) drawTree(ctx, sx + 20, groundY, zone.treeColor);
                     break;
 
                 case 2: // Water Features
-                    if (wx % 200 === 0) drawFountain(ctx, sx + 12, CONFIG.GROUND_Y);
-                    if (wx % 120 === 0 && wx % 200 !== 0) {
+                    if (wx % 400 === 0) drawFountain(ctx, sx + 24, groundY);
+                    if (wx % 240 === 0 && wx % 400 !== 0) {
                         ctx.fillStyle = zone.waterColor || '#4AA8D8';
-                        ctx.fillRect(sx, CONFIG.GROUND_Y + 32, 28, 8);
+                        ctx.fillRect(sx, groundY + 64, 56, 16);
                         ctx.fillStyle = zone.waterLight || '#6BC8F0';
-                        ctx.fillRect(sx + 3, CONFIG.GROUND_Y + 33, 6, 2);
-                        ctx.fillRect(sx + 14, CONFIG.GROUND_Y + 35, 8, 2);
+                        ctx.fillRect(sx + 6, groundY + 66, 12, 4);
+                        ctx.fillRect(sx + 28, groundY + 70, 16, 4);
                         ctx.fillStyle = '#888';
-                        ctx.fillRect(sx - 1, CONFIG.GROUND_Y + 30, 30, 2);
-                        ctx.fillRect(sx - 1, CONFIG.GROUND_Y + 40, 30, 2);
+                        ctx.fillRect(sx - 2, groundY + 60, 60, 4);
+                        ctx.fillRect(sx - 2, groundY + 80, 60, 4);
                     }
                     break;
 
                 case 3: // Pillar Pathway
-                    if (wx % 120 === 0) drawPillar(ctx, sx + 12, CONFIG.GROUND_Y);
-                    if (wx % 240 === 0) {
+                    if (wx % 240 === 0) drawPillar(ctx, sx + 24, groundY);
+                    if (wx % 480 === 0) {
                         ctx.fillStyle = '#D4B896';
-                        ctx.fillRect(sx + 12, CONFIG.GROUND_Y - 82, 120, 4);
+                        ctx.fillRect(sx + 24, groundY - 164, 240, 8);
                         ctx.fillStyle = '#C4A880';
-                        ctx.fillRect(sx + 12, CONFIG.GROUND_Y - 78, 120, 2);
+                        ctx.fillRect(sx + 24, groundY - 156, 240, 4);
                     }
                     break;
 
                 case 4: // Temple approach with lamps
-                    if (wx % 120 === 0 && wx < 3550) {
+                    if (wx % 240 === 0 && wx < 2620) {
                         ctx.fillStyle = '#B49070';
-                        ctx.fillRect(sx + 16, CONFIG.GROUND_Y - 42, 4, 42);
+                        ctx.fillRect(sx + 32, groundY - 84, 8, 84);
                         ctx.fillStyle = '#FFD700';
-                        ctx.fillRect(sx + 13, CONFIG.GROUND_Y - 49, 10, 9);
+                        ctx.fillRect(sx + 26, groundY - 98, 20, 18);
                         ctx.fillStyle = '#FFA500';
-                        ctx.fillRect(sx + 15, CONFIG.GROUND_Y - 47, 6, 5);
+                        ctx.fillRect(sx + 30, groundY - 94, 12, 10);
                     }
                     break;
             }
         }
     }
 
+    // Temple stairs at worldX=2620
+    function renderStairs(ctx, cameraX) {
+        const stairsWorldX = 2620;
+        const sx = stairsWorldX - cameraX;
+        if (sx > CONFIG.WIDTH + 50 || sx < -300) return;
+
+        const GY = CONFIG.GROUND_Y;
+        // 4 steps: each 60px wide narrower, 40px tall
+        // Step widths: 240, 160, 100, 60
+        const stepWidths = [240, 160, 100, 60];
+        const stepH = 40;
+
+        for (let i = 0; i < 4; i++) {
+            const sw = stepWidths[i];
+            const xOffset = (240 - sw) / 2; // center narrower steps
+            const stepX = sx + xOffset;
+            const stepY = GY - stepH * (i + 1);
+
+            ctx.fillStyle = '#F0E8D8';
+            ctx.fillRect(stepX, stepY, sw, stepH);
+
+            // Gold top edge
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(stepX, stepY, sw, 4);
+
+            // Shadow on bottom of each step face
+            ctx.fillStyle = 'rgba(0,0,0,0.12)';
+            ctx.fillRect(stepX, stepY + stepH - 4, sw, 4);
+
+            // Side edge highlight
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fillRect(stepX, stepY + 4, 4, stepH - 4);
+        }
+    }
+
     function renderTempleEnd(ctx, cameraX) {
-        const templeX = 3580;
+        // Temple drawn at worldX ~2550 (adjusted for V1 scale)
+        const templeX = 2560;
         const sx = templeX - cameraX;
-        if (sx < CONFIG.WIDTH + 30 && sx > -160) {
+        if (sx < CONFIG.WIDTH + 60 && sx > -320) {
             drawTemple(ctx, sx, CONFIG.GROUND_Y);
         }
     }
 
-    // Traditional Toran Archway at Choice Points
+    // Traditional Toran Archway at Choice Points (2× V0)
     function renderChoiceMarkers(ctx, cameraX, choices) {
         choices.forEach(cp => {
             if (cp.passed) return;
             const sx = cp.worldX - cameraX;
-            if (sx < -40 || sx > CONFIG.WIDTH + 40) return;
+            if (sx < -80 || sx > CONFIG.WIDTH + 80) return;
 
-            // Carved Sandstone Pillars
+            // Carved Sandstone Pillars (2× V0)
             ctx.fillStyle = '#C4A060';
-            ctx.fillRect(sx - 4, CONFIG.GROUND_Y - 65, 7, 65);
-            ctx.fillRect(sx + 24, CONFIG.GROUND_Y - 65, 7, 65);
+            ctx.fillRect(sx - 8, CONFIG.GROUND_Y - 130, 14, 130);
+            ctx.fillRect(sx + 48, CONFIG.GROUND_Y - 130, 14, 130);
 
             // Pillar bases and capitals
             ctx.fillStyle = '#E8D0B0';
-            ctx.fillRect(sx - 6, CONFIG.GROUND_Y - 68, 11, 4);
-            ctx.fillRect(sx + 22, CONFIG.GROUND_Y - 68, 11, 4);
+            ctx.fillRect(sx - 12, CONFIG.GROUND_Y - 136, 22, 8);
+            ctx.fillRect(sx + 44, CONFIG.GROUND_Y - 136, 22, 8);
 
             // Toran Arch (Top Bar)
             ctx.fillStyle = '#B45309';
-            ctx.fillRect(sx - 6, CONFIG.GROUND_Y - 72, 39, 5);
+            ctx.fillRect(sx - 12, CONFIG.GROUND_Y - 144, 78, 10);
 
             // Auspicious Marigold Garland & Mango Leaves
-            for (let i = 0; i < 6; i++) {
-                const lx = sx - 4 + i * 6;
+            for (let i = 0; i < 12; i++) {
+                const lx = sx - 8 + i * 6;
                 ctx.fillStyle = i % 2 === 0 ? '#15803D' : '#F59E0B';
-                ctx.fillRect(lx, CONFIG.GROUND_Y - 67, 4, 3);
+                ctx.fillRect(lx, CONFIG.GROUND_Y - 134, 8, 6);
             }
 
             // Divine Aura Glow
             const auraPulse = 0.5 + 0.5 * Math.sin(animTick * 0.12);
             ctx.fillStyle = `rgba(255, 215, 0, ${0.1 + 0.1 * auraPulse})`;
-            ctx.fillRect(sx - 10, CONFIG.GROUND_Y - 75, 47, 75);
+            ctx.fillRect(sx - 20, CONFIG.GROUND_Y - 150, 94, 150);
 
             // Sparkling question mark
             ctx.fillStyle = '#FFD700';
-            ctx.font = 'bold 15px monospace';
+            ctx.font = 'bold 30px monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
-            ctx.fillText('?', sx + 13, CONFIG.GROUND_Y - 73);
+            ctx.fillText('?', sx + 27, CONFIG.GROUND_Y - 146);
         });
     }
 
-    function renderProgressBar(ctx, worldX) {
-        const bx = 45, by = 5, bw = CONFIG.WIDTH - 90, bh = 8;
+    function renderProgressBar(ctx, worldX, demonWorldX) {
+        const bx = 90, by = 8, bw = CONFIG.WIDTH - 180, bh = 14;
 
         // Outer container
         ctx.fillStyle = 'rgba(7, 9, 22, 0.75)';
-        ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
+        ctx.fillRect(bx - 3, by - 3, bw + 6, bh + 6);
         ctx.fillStyle = '#4B5563';
         ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
 
@@ -394,29 +436,61 @@ const Background = (() => {
 
         // Temple icon at the end
         ctx.fillStyle = '#FFD700';
-        ctx.fillRect(bx + bw - 6, by - 3, 6, bh + 6);
+        ctx.fillRect(bx + bw - 10, by - 5, 10, bh + 10);
+
+        // Demon marker (dark purple triangle/arrow pointing right)
+        if (typeof demonWorldX === 'number') {
+            const dpx = bx + Math.min(1, demonWorldX / CONFIG.TOTAL_DISTANCE) * bw;
+            ctx.fillStyle = '#7C3AED';
+            // Triangle arrow pointing right
+            ctx.beginPath();
+            ctx.moveTo(dpx, by - 4);
+            ctx.lineTo(dpx + 10, by + bh / 2);
+            ctx.lineTo(dpx, by + bh + 4);
+            ctx.closePath();
+            ctx.fill();
+        }
 
         // Player marker
         const px = bx + Math.min(1, worldX / CONFIG.TOTAL_DISTANCE) * bw;
         ctx.fillStyle = '#EF4444';
-        ctx.fillRect(px - 3, by - 3, 6, bh + 6);
+        ctx.fillRect(px - 5, by - 5, 10, bh + 10);
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(px - 1, by - 1, 2, bh + 2);
+        ctx.fillRect(px - 2, by - 2, 4, bh + 4);
 
-        // Current Zone indicator banner
-        const cz = CONFIG.getZone(worldX);
-        ctx.font = 'bold 7px "Segoe UI", Arial, sans-serif';
+        // Zone labels in Gujarati below bar
+        ctx.font = 'bold 10px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
+
+        // Current zone Gujarati label
+        const cz = CONFIG.getZone(worldX);
         ctx.fillStyle = '#000';
-        ctx.fillText(cz.nameGuj, CONFIG.WIDTH / 2 + 1, by + bh + 4);
+        ctx.fillText(cz.nameGuj, CONFIG.WIDTH / 2 + 1, by + bh + 6);
         ctx.fillStyle = '#FFD700';
-        ctx.fillText(cz.nameGuj, CONFIG.WIDTH / 2, by + bh + 3);
+        ctx.fillText(cz.nameGuj, CONFIG.WIDTH / 2, by + bh + 5);
+    }
+
+    // Demon warning pulse: red glow on left edge
+    function renderDemonWarning(ctx, warningLevel, frameCount) {
+        if (!warningLevel || warningLevel < 1) return;
+        const fc = frameCount || 0;
+        let alpha;
+        if (warningLevel === 1) {
+            alpha = 0.08;
+        } else {
+            alpha = 0.08 + 0.12 * Math.abs(Math.sin(fc * 0.3));
+        }
+        const grad = ctx.createLinearGradient(0, 0, 160, 0);
+        grad.addColorStop(0, `rgba(255,0,0,${alpha})`);
+        grad.addColorStop(1, 'rgba(255,0,0,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 160, CONFIG.HEIGHT);
     }
 
     // ---- Public render ----
 
-    function render(ctx, worldX, choices) {
+    function render(ctx, worldX, choices, demonWorldX, warningLevel, frameCount) {
         animTick++;
         const cameraX = Math.max(0, worldX - CONFIG.PLAYER_X);
         renderSky(ctx, cameraX);
@@ -424,9 +498,11 @@ const Background = (() => {
         renderDistantBG(ctx, cameraX);
         renderGround(ctx, cameraX);
         renderDecorations(ctx, cameraX);
+        renderStairs(ctx, cameraX);
         renderTempleEnd(ctx, cameraX);
-        renderChoiceMarkers(ctx, cameraX, choices);
-        renderProgressBar(ctx, worldX);
+        renderChoiceMarkers(ctx, cameraX, choices || []);
+        renderProgressBar(ctx, worldX, demonWorldX);
+        renderDemonWarning(ctx, warningLevel, frameCount);
     }
 
     return { render };

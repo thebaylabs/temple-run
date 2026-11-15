@@ -1,101 +1,77 @@
-# 🎮 Annakut Family Path — Project State & Technical Documentation
+# 🎮 Annakut Family Path — V1 Project State & Technical Handoff Report
 
-> **Status:** Production-Ready & Feature-Complete Prototype.
+> **Status:** V1 Complete & Fully Playable on 960×540 (1080p display ready).
 > **Location:** `/Users/deepk/Desktop/annakut_game/`
+> **Git Branch:** `deeplearns1` on `https://github.com/thebaylabs/temple-run`
 
 ---
 
-## 1. Project Overview & Identity
+## 1. Executive Summary & V1 Highlights
 
-* **Event / Organization:** Annakut function of the **Swaminarayan Hariprabodham Parivar**.
-* **Core Theme:** **Family & Spiritual Values** ("સંપ, સુહ્રદભાવ અને એકતા એ જ સુખી પરિવારનો પાયો").
-* **Game Concept:** An 8-bit retro side-scroller where the player manually advances a young devotee through 5 scenic zones inspired by Akshardham to reach the Mandir. Along the path, they encounter 8 moral dilemmas centered around family, digital habits, devotion, and character.
-* **Hardware Requirement:** Fully playable with a **3-key physical keyboard / macro pad**.
+All 10 requested changes for V1 have been fully implemented and tested:
 
----
-
-## 2. Controls & Keyboard Compatibility
-
-The game includes broad key mappings to support any commercial 3-key mechanical macro keypad or standard keyboard out of the box:
-
-| Button | Primary Binding | Macro / Numpad Binding | Arrow Key Fallback | Game Function |
-|:---:|:---:|:---:|:---:|:---|
-| **Left** | `KeyA` | `1` / `Numpad1` / `Z` / `J` | `ArrowLeft` | Select Left Choice |
-| **Center** | `KeyS` | `2` / `Numpad2` / `X` / `K` | `ArrowDown` / `Space` / `Enter` | **Hold to Walk** / Start / Restart |
-| **Right** | `KeyD` | `3` / `Numpad3` / `C` / `L` | `ArrowRight` | Select Right Choice |
-
-### Booth Kiosk Shortcuts:
-* **`F`**: Toggle Fullscreen mode (great for presentation monitors/TVs).
-* **`M`**: Mute / Unmute audio.
-* **Touchscreen**: Left 1/3, Middle 1/3, and Right 1/3 screen taps act as Left, Walk, and Right buttons for tablets.
+| # | Feature | Implementation Details |
+|---|---------|------------------------|
+| 1 | **Higher Resolution (960×540)** | 2× integer scale of 480×270. Crisp retro pixel art scaled for 1080p displays with `image-rendering: pixelated`. |
+| 2 | **Secret Escape Sequence** | Pressing `[D, D, A]` (Right, Right, Left) within 45 frames (1.5s) immediately aborts to Title screen. |
+| 3 | **Auto-Run Mode & 5 Questions** | Dino-style continuous running. Speed ramps: `[1.8, 2.2, 2.6, 3.0, 3.3, 3.5 px/frame]` based on questions answered. 5 questions selected randomly per run from a 12-question bank. |
+| 4 | **Jump Obstacles** | Jump button mapped to `S` / `2` / `Space`. Parabolic 130px arc over Instagram, TikTok, Vice Bottle, and Cigarette Smoke obstacles. |
+| 5 | **Terrain Ups & Downs** | Smooth ramps raising/lowering ground elevation by +50px over 200px spans. |
+| 6 | **3-Lives System** | 3 pixel hearts HUD on top-left. Hitting obstacle or wrong choice deducts 1 life and triggers 90-frame (3s) blinking invincibility + safe 120px rollback. |
+| 7 | **Distraction Demon ("Vikshep")** | Shadowy figure with glowing phone chasing the player. Pushed back 80px on good answers, leaps 150px closer on bad answers. Edge warning pulse. |
+| 8 | **Compact 45-Second Duration** | World distance reduced from 3900 to 2700 units; full correct run takes ~45 seconds. |
+| 9 | **5-Second Moral Banner** | Answering correctly displays moral reflection banner for 150 frames (5s) while character continues running. |
+| 10 | **Temple Stair Climb Finale** | Character ascends 4 marble steps into the Mandir while demon retreats and temple bells chime. |
 
 ---
 
-## 3. Architecture & Modular Structure
+## 2. Controls & Hardware Mapping
 
-The project has zero external npm, python, or framework dependencies. All modules run in standard browsers:
+| Key | Macro / Keypad | Touch | Action |
+|:---:|:---:|:---:|:---|
+| `A` | `1` / `Numpad1` / `Left Arrow` | Left 1/3 screen | Choose Left Option |
+| `S` | `2` / `Numpad2` / `Space` / `Enter` | Center 1/3 screen | **JUMP** / Start / Restart |
+| `D` | `3` / `Numpad3` / `Right Arrow` | Right 1/3 screen | Choose Right Option |
+| `F` | — | — | Toggle Fullscreen |
+| `M` | — | — | Toggle Audio Mute |
+| `[D, D, A]` | `[3, 3, 1]` | — | **Secret Reset to Title** |
+
+---
+
+## 3. Architecture & File Tree
 
 ```
 annakut_game/
-├── index.html                   # HTML5 Canvas wrapper, font definitions & styling
-├── README.md                    # Quick start instructions & control guide
-├── PROJECT_STATE_REPORT.md      # Full architecture & status documentation
+├── index.html                   # 960×540 canvas wrapper with CSS pixelated integer scaling
+├── README.md                    # Player guide & booth instructions
+├── PROJECT_STATE_REPORT.md      # This complete technical handoff
+├── assets/                      # PNG asset folders (ready for custom images)
+│   ├── character/               # character_sheet.png (optional)
+│   ├── demon/                   # demon_sheet.png (optional)
+│   ├── obstacles/               # obs_instagram.png, obs_tiktok.png, obs_bottle.png, obs_cigarette.png
+│   └── temple/
 └── js/
-    ├── config.js                # Physics, world boundaries, zone definitions, booth stats
-    ├── audio.js                 # Pure Web Audio API 8-bit chiptune sound synthesis & ambient BGM
-    ├── particles.js             # Retro particle system (confetti, petals, fountain spray, fireworks)
-    ├── input.js                 # 3-key engine with multi-key aliases, touch & idle timer
-    ├── background.js            # Parallax sky, clouds, 5 Akshardham zones, Toran gates & Mandir
-    ├── player.js                # 8-bit character with authentic Tilak-Chandlo & animation states
-    ├── choices.js               # 8 bilingual dilemmas, procedural icons, dynamic shuffling
-    └── game.js                  # State machine, rollback logic, moral feedback, kiosk auto-reset
+    ├── config.js                # 960×540 constants, SPEEDS, WORLD_EVENTS, getGroundY()
+    ├── audio.js                 # Web Audio API 8-bit chiptune sound synthesis & ambient BGM
+    ├── particles.js             # Retro particles (flower petals, fountain spray, golden aura, fireworks)
+    ├── assets.js                # Asynchronous image manifest loader with procedural fallback
+    ├── input.js                 # 3-key handler (A/S/D, 1/2/3), touch, escape sequence [D,D,A]
+    ├── obstacles.js             # AABB collision detection & 4 jump obstacle renders
+    ├── demon.js                 # Vikshep AI, dynamic catch speed, warning level, retreat states
+    ├── background.js            # Parallax sky, clouds, 5 zones, terrain ramps, temple stairs, HUD bar
+    ├── player.js                # 96px pixel character with authentic Tilak-Chandlo, jump physics, blink
+    ├── choices.js               # 12 questions bank, 5-pick shuffle, scaled UI, 5s moral banner
+    └── game.js                  # Master state machine, auto-run loop, lives, temple climb, game over
 ```
 
 ---
 
-## 4. Key Systems Implemented
+## 4. How to Test Right Now
 
-### 🔊 1. Web Audio API Chiptune Engine (`js/audio.js`)
-* Synthesizes 8-bit sounds directly in JavaScript with zero MP3/WAV files:
-  * Footstep clicks as the character walks.
-  * Mystery chime when approaching a choice Toran gate.
-  * Ascending celebratory major chord on good choices.
-  * Low buzz & wobble on poor choices.
-  * Retro tape-rewind effect during rollback.
-  * Resonant Indian temple bell chime upon zone transitions and victory.
-  * Peaceful 16-step pentatonic chiptune ambient melody loop.
-
-### 🌸 2. Retro Particle Engine (`js/particles.js`)
-* Zone 0 & 1: Drifting flower petals in the gardens.
-* Zone 2: Shimmering water droplets from fountains.
-* Zone 3: Warm golden dust motes along the carved pillar pathway.
-* Zone 4: Golden temple sparkles and diya embers.
-* Celebration & Victory: Multi-color confetti bursts and fireworks.
-
-### 🕉️ 3. Bilingual Content & Character Fidelity (`js/choices.js`, `js/player.js`)
-* Prompts, zone titles, and dilemmas are rendered in both English and Gujarati.
-* Character features an authentic **orange U-shaped Tilak with red Chandlo** on his forehead, a white kurta, navy blue pajama, and expressive facial states (blinking, smiling, stumbling with "X" eyes).
-
-### 🏛️ 4. The 8 Family & Spiritual Dilemmas
-1. **Phone vs. Reading:** 📖 Read a Good Book *(વાંચન)* vs. 📱 Endless Social Media *(સોશિયલ મીડિયા)*
-2. **Dinner Time:** 🍽️ Eat Dinner with Family *(સાથે જમવું)* vs. 🎮 Eat Alone in Room *(રૂમમાં એકલા)*
-3. **Helping Parents:** 🧹 Happily Help with Chores *(સેવા/મદદ)* vs. 😴 Ignore & Be Lazy *(આળસ)*
-4. **Grandparents:** 🗣️ Sit & Listen Lovingly *(પ્રેમથી સાંભળવું)* vs. 🎧 Keep Headphones On *(હેડફોન)*
-5. **Morning Routine:** 🏃 Exercise Outside *(કસરત/ચાલવું)* vs. 📺 Binge-watch Screen *(આખો દિવસ ટીવી)*
-6. **Evening Puja:** 🪔 Daily Puja & Niyam *(નિયમિત પૂજા)* vs. ⏰ Skip / Do It Later *(ટાળવું)*
-7. **Forgiveness:** ❤️ Forgive with a Big Heart *(મોટા મનથી માફી)* vs. 😤 Hold Anger & Grudge *(વેર/ગુસ્સો)*
-8. **Weekend Goals:** 👨‍👩‍👧‍👦 Quality Family Time *(પરિવાર સાથે સમય)* vs. 💼 Selfish & Lonely Habits *(સ્વાર્થ)*
-
-### 🎪 5. Exhibition Booth & Kiosk Features
-* **Inactivity Auto-Reset:** If a child walks away mid-game, the game waits 40 seconds and safely returns to the attract title screen.
-* **Pilgrim Counter:** Automatically records every completed Mandir arrival in `localStorage` so booth organizers can see how many attendees played.
-* **Anti-Memorization Shuffling:** The good and bad choices swap randomly on each checkpoint so each run requires real reflection.
-
----
-
-## 5. How to Run & Display at the Event
-
-1. Double-click [index.html](file:///Users/deepk/Desktop/annakut_game/index.html) in Chrome or Safari.
-2. Press **`F`** for fullscreen mode.
-3. Plug in your 3-key keyboard (configured to send `A`, `S`, `D` or `1`, `2`, `3`).
-4. Press **`S`** (or `2`) to start!
+1. Open [index.html](file:///Users/deepk/Desktop/annakut_game/index.html) in your browser.
+2. Press **`F`** to test fullscreen mode.
+3. Press **`S`** (or `2`) to start auto-running.
+4. Press **`S`** (or `2`) to jump over incoming social media obstacles!
+5. Use **`A`** or **`D`** to select answers when approaching dilemma gates.
+6. Notice the 5-second moral reflection banner at the bottom while you keep running!
+7. Complete all 5 questions to climb the temple stairs into the Mandir.
