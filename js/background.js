@@ -1068,13 +1068,58 @@ const Background = (() => {
         drawTempleLive(ctx, x, baseY);
     }
 
-    // Traditional Toran Archway at Choice Points
+    /** Ringing alarm clock on a bedside table: the gate for Stage 1. */
+    function drawAlarmClock(ctx, sx, GY) {
+        const shake = Math.round(Math.sin(animTick * 1.3) * 2);
+        // bedside table
+        R(ctx, '#7A4A22', sx - 30, GY - 44, 60, 8);
+        R(ctx, '#9A6230', sx - 30, GY - 44, 60, 2);
+        R(ctx, '#5E3817', sx - 26, GY - 36, 6, 36);
+        R(ctx, '#5E3817', sx + 20, GY - 36, 6, 36);
+        R(ctx, '#6B4226', sx - 20, GY - 30, 40, 16);
+        R(ctx, '#D9A520', sx - 3, GY - 24, 6, 4);
+
+        const cx = sx + shake, cy = GY - 76;
+        // legs, bells, hammer
+        R(ctx, '#374151', cx - 22, cy + 22, 6, 10);
+        R(ctx, '#374151', cx + 16, cy + 22, 6, 10);
+        blob(ctx, '#F59E0B', cx - 18, cy - 26, 11);
+        blob(ctx, '#F59E0B', cx + 18, cy - 26, 11);
+        blob(ctx, '#FDE68A', cx - 20, cy - 29, 5);
+        blob(ctx, '#FDE68A', cx + 16, cy - 29, 5);
+        R(ctx, '#374151', cx - 2 + shake * 2, cy - 38, 4, 12);
+        R(ctx, '#374151', cx - 5 + shake * 2, cy - 42, 10, 5);
+        // body and face
+        blob(ctx, '#B91C1C', cx, cy, 30);
+        blob(ctx, '#EF4444', cx, cy, 27);
+        blob(ctx, '#FFF8E7', cx, cy, 21);
+        for (let i = 0; i < 12; i++) {
+            const a = i * Math.PI / 6;
+            R(ctx, '#374151', cx + Math.sin(a) * 17 - 1, cy - Math.cos(a) * 17 - 1, i % 3 === 0 ? 3 : 2, i % 3 === 0 ? 3 : 2);
+        }
+        R(ctx, '#111827', cx - 1, cy - 14, 3, 15);        // minute hand at 12
+        R(ctx, '#111827', cx - 11, cy - 5, 12, 3);        // hour hand pointing to 6 o'clock side
+        R(ctx, '#EF4444', cx - 2, cy - 2, 5, 5);
+        // ringing lines
+        if (Math.floor(animTick / 4) % 2 === 0) {
+            [[-46, -30], [-52, -14], [-46, 2], [42, -30], [48, -14], [42, 2]].forEach(([dx, dy]) => {
+                R(ctx, '#FFD700', sx + dx, cy + dy, 8, 3);
+            });
+        }
+    }
+
+    /** Stage gates: an alarm clock for Stage 1, a toran arch for the others. */
     function renderChoiceMarkers(ctx, cameraX, choices) {
         const GY = CONFIG.GROUND_Y;
         choices.forEach(cp => {
             if (cp.passed) return;
-            const sx = Math.round(cp.worldX - cameraX) + 50;   // just ahead of the player
+            const sx = Math.round(cp.worldX - cameraX) + 80;   // just ahead of the player
             if (sx < -120 || sx > CONFIG.WIDTH + 120) return;
+
+            if (cp.kind === 'alarm') {
+                drawAlarmClock(ctx, sx + 20, GY);
+                return;
+            }
 
             const auraPulse = 0.5 + 0.5 * Math.sin(animTick * 0.12);
             ctx.fillStyle = `rgba(255, 215, 0, ${0.12 + 0.1 * auraPulse})`;
@@ -1096,13 +1141,15 @@ const Background = (() => {
                 const dip = Math.round(Math.sin(Math.PI * i / 13) * 10);
                 R(ctx, i % 2 === 0 ? '#15803D' : '#F59E0B', lx, GY - 146 + dip, 6, 6);
             }
-            ctx.fillStyle = '#000000';
-            ctx.font = 'bold 34px monospace';
+            // stage name plaque above the arch
+            R(ctx, '#0F172A', sx - 26, GY - 192, 108, 26);
+            R(ctx, '#FFD700', sx - 26, GY - 192, 108, 3);
+            R(ctx, '#FFD700', sx - 26, GY - 169, 108, 3);
+            ctx.font = 'bold 16px monospace';
             ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText('?', sx + 30, GY - 162);
+            ctx.textBaseline = 'middle';
             ctx.fillStyle = '#FFD700';
-            ctx.fillText('?', sx + 28, GY - 164);
+            ctx.fillText(cp.label || '?', sx + 28, GY - 178);
         });
     }
 

@@ -1,159 +1,143 @@
-# 🎮 Annakut Family Path — V1.1 Project State & Technical Handoff
+# 🎮 Annakut Family Path — V1.2 Project State & Technical Handoff
 
-> **Status:** V1.1 complete and playable.
+> **Status:** V1.2 complete and playable.
 > **Repo:** `https://github.com/thebaylabs/temple-run`, branch `deeplearns1`
-> **Stack:** HTML5 Canvas + vanilla JavaScript. No frameworks, no build step, runs from `file://`.
-> **Canvas:** 960×540, fixed 30 fps game loop.
+> **Stack:** HTML5 Canvas for the game, HTML/CSS for buttons and stage screens, vanilla JavaScript. No frameworks, no build step, runs from `file://`.
+> **Game picture:** 960×540, fixed 30 fps loop, scaled to fill the window.
 
 ---
 
-## 1. What changed from V1 to V1.1
+## 1. What changed from V1.1 to V1.2
 
-| Area | V1 | V1.1 |
+| Area | V1.1 | V1.2 |
 |---|---|---|
-| Speed | 1.8–3.5 px/frame | 4.5–7.0 px/frame, still ramping per question |
-| World length | 2,700 px | 6,500 px, so run time is unchanged |
-| Obstacles | Never appeared (see section 6) | Appear, drawn from the PNG art, with a warning arrow |
-| Character | Drawn from rectangles | 7-pose sprite sheet, rectangles kept as fallback |
-| Demon | Drawn from rectangles, usually off-screen | 4-pose sprite sheet, always visible behind the player |
-| Terrain | Ramps up and down | Flat everywhere; only the temple staircase rises |
-| Stair climb | Drawn but not climbable | Real 4-step staircase the player walks up |
-| Backgrounds | Sparse procedural shapes | Detailed code-drawn layers per zone, new temple |
-| Lesson after a right answer | Small banner at the bottom, game kept running | Centred card, game paused for 5 seconds |
-| Jump collision | Tested the player's head | Tests the player's feet, with a forgiving hitbox |
+| Screen size | Snapped to whole multiples (1×, 2×) | Scales smoothly to fill any window |
+| Buttons | Keyboard only, plus invisible thirds of the screen | Three on-screen buttons with live labels that glow on key press |
+| Phones | Not laid out for them | Upright layout: game on top, large buttons below |
+| Questions | 5 random from a bank of 12 | 4 fixed stages with their own flow (`js/stages.js`) |
+| Question screens | Drawn on the canvas | HTML overlay: sharp text at any size, tappable answers |
+| Life lost on a question | Small HUD heart | Large hearts on the stage screen with a break animation |
+| Jump | 26 frames, 140 px | 34 frames, 150 px |
+| Course length | 6,500 px | 7,800 px |
+| Stage 1 gate | Toran arch | Ringing alarm clock |
+| Quick taps | Could be missed | Always registered |
 
 ---
 
 ## 2. Game flow (state machine in `js/game.js`)
 
 ```
-title ──centre──▶ running ──reach gate──▶ choice
-                     ▲                       │
-                     │            right ─────┼──▶ moral_banner (paused 5 s) ──▶ running
-                     │            wrong ─────┘──▶ running (life lost, question re-queued)
-                     │
-running ──all 5 answered and x ≥ VICTORY_X──▶ temple_climb ──x ≥ TOTAL_DISTANCE──▶ victory
-running / choice ──lives reach 0──▶ game_over
-any state ──D, D, A or 40 s idle──▶ title
+title ──START──▶ running ──reach a stage gate──▶ stage (run paused, Stages in control)
+                    ▲                                │
+                    └──────── stage cleared ─────────┤
+                                                     └── lives reach 0 ──▶ game_over
+running ──all stages cleared and x ≥ VICTORY_X──▶ temple_climb ──▶ victory
+running ──lives reach 0──▶ game_over
+any state except stage ──D, D, A──▶ title          any state ──40 s idle──▶ title
 ```
 
-- `worldX` is the left edge of the player sprite in world pixels. The camera is `worldX - PLAYER_X`.
-- `moral_banner` is a full pause: nothing moves except the celebrate animation and the countdown.
-- `placeGate()` positions a question gate so it is never within reach of an obstacle and never on the stairs. It is used when a missed question is re-queued and to guarantee a 500 px run-up before the next question.
+- `worldX` is the left edge of the player sprite in world pixels; the camera is `worldX - PLAYER_X`.
+- `stagesCleared` drives the speed (`CONFIG.getSpeed`), the demon's distance and which gate is next.
+- While in `stage`, `game.js` only calls `Stages.update()`. The stage talks back through `stageHooks`: `getLives`, `loseLife`, `onClear`, `onGameOver`.
 
-## 3. World layout (`js/config.js`)
+## 3. The course (`js/config.js`)
 
-| World X | Event |
+| World X | What |
 |---|---|
-| 700 | Obstacle: Instagram |
-| 1300 | Question 1 |
-| 2000 | Obstacle: TikTok |
-| 2600 | Question 2 |
-| 3300 | Obstacle: bottle |
-| 3900 | Question 3 |
-| 4500 | Obstacle: cigarette |
-| 5000 | Question 4 |
-| 5700 | Question 5 |
-| 6060 | Temple climb begins (`VICTORY_X`) |
-| 6100 | First stair riser (`STAIRS_X`), 4 steps of 80×26 px |
-| 6500 | Player stops (`TOTAL_DISTANCE`) |
-| 6560 | Left edge of the temple (`TEMPLE_X`) |
+| 600 | Stage 1 gate (alarm clock) |
+| 1400, 2100 | Cigarette, bottle |
+| 2800 | Stage 2 gate |
+| 3500, 4200 | Instagram, TikTok |
+| 4900 | Stage 3 gate |
+| 5600, 6300 | Two random obstacles, never the same kind twice |
+| 6900 | Stage 4 gate |
+| 7360 | Temple climb begins (`VICTORY_X`) |
+| 7400 | First stair riser (`STAIRS_X`), 4 steps of 80×26 px |
+| 7800 | Player stops (`TOTAL_DISTANCE`) |
+| 7860 | Left edge of the temple (`TEMPLE_X`) |
 
-Zones: Garden Gate 0–1400, Flower Gardens 1400–2800, Water Features 2800–4200, Pillar Pathway 4200–5600, Mandir 5600–6500.
+Zones: Garden Gate 0–1500, Flower Gardens 1500–3000, Water Features 3000–4500, Pillar Pathway 4500–6000, Mandir 6000–7800. Speeds per stage cleared: 4.5, 5.2, 5.9, 6.5, 7.0 px/frame.
 
-`CONFIG.getGroundY(x)` returns `GROUND_Y` (430) everywhere except on the staircase, where it steps up by 26 px per stair.
+## 4. Stages (`js/stages.js`)
 
-## 4. Module by module
+`STAGE_DATA` holds all the content; the `Stages` module below it turns that data into screens. A stage is an intro card, a list of steps asked in order, and an optional outro card.
+
+Each step has a prompt and two options:
+
+| Option shape | Behaviour |
+|---|---|
+| `{ text, good: true }` | Right answer; go to the next step |
+| `{ text, good: true, then: {card} }` | Right answer; show the card first |
+| `{ text, good: false, why }` | Costs a life, shows a red card with the reason, asks again |
+| `{ text, good: false, wrong: {card} }` | Same, with a custom card (used for the dark consequence screens) |
+
+- `yesno: true` keeps option 1 on the left (YES) and option 2 on the right (NO). Otherwise sides are shuffled every time the question is shown.
+- Card fields: `tone` (`info`, `good`, `bad`, `dark`), `icon`, `title`, `lead`, `bullets`, `cons`, `grade`, `guj`, `delay` (frames before the button appears), `button`, `ask`.
+- A stage with a `chain` array shows a flow chart above its questions that fills in as steps are cleared.
+- When a wrong answer takes the last life, the wrong card is still shown; its button then leads to game over.
+
+Current content:
+
+| Stage | Steps | Notes |
+|---|---|---|
+| 1 The Best Way to Start Your Day | 3 linked questions | Intro button after 3 s; flow chart |
+| 2 The Power of Choice | 1 question | Wrong: dark consequences, RESCUE ME after 2 s |
+| 3 Good Friends and Focus | Scenario, then "upgrade?" | B+ → A+; saying NO keeps B+ and still clears the stage |
+| 4 Work While You Work, Play While You Play | 4 yes/no | From the supplied flow chart; for "check your phone while working" the right answer is NO |
+
+## 5. Screen layout and buttons (`js/ui.js`, `css/style.css`)
+
+`UI.layout()` runs on load and on every resize:
+
+- **Wide** (width ÷ height ≥ 1.2): the canvas is scaled to fit the window and centred. The button bar overlaps the bottom 14% of the canvas (`BUTTON_BAR_FRACTION`), so nothing important is drawn there. The stage overlay covers the canvas above the bar.
+- **Tall** (phone upright): the button bar is fixed to the bottom of the screen (22% of the height, 110–220 px), the canvas is centred in the space above, and the stage overlay fills all of that space.
+
+It sets the CSS variable `--u` (screen pixels per game pixel). Stage-screen text scales with it but has a floor (`--fmin`) so it stays readable on small screens.
+
+`UI.setLabels(left, centre, right)` is called by `game.js` or `Stages` every frame; a `null` label dims that button. `UI.update()` adds the `pressed` class while `Input.keys[action]` is true.
+
+## 6. Input (`js/input.js`)
+
+- Keyboard, on-screen buttons and taps on the canvas thirds all end up in `Input.keys` and `Input.justPressed`.
+- `Input.press(action)` / `release(action)` are used by held buttons; `Input.tap(action)` is a one-shot used by tappable answers.
+- Any press also queues a one-frame "tapped" flag, so a press that starts and ends between two game frames is still seen.
+- The D-D-A reset is ignored in the `stage` state because three quick answers (right, right, left) are indistinguishable from it.
+
+## 7. Other modules
 
 | File | Role |
 |---|---|
-| `config.js` | All constants, zones, `WORLD_EVENTS`, `getSpeed`, `getGroundY`, run counter in `localStorage` |
-| `assets.js` | Loads the PNG manifest. `Assets.sprite(key, [x,y,w,h], drawH)` cuts one region out of a source image, scales it once to its on-screen size, and caches it |
-| `input.js` | Key, touch and pointer mapping to `left` / `jump` / `right`; the D-D-A reset sequence |
-| `obstacles.js` | Builds obstacles from `WORLD_EVENTS`, draws them (PNG or fallback), feet-based collision |
-| `player.js` | Picks the pose for the current state, jump arc, blink after a hit, rectangle fallback |
-| `demon.js` | Gap-based chaser, pose selection, fade-out at the temple |
-| `background.js` | Sky, clouds, hills, skyline, per-zone mid and near layers, ground, stairs, temple, question gates, progress bar |
-| `choices.js` | 12-question bank, picks 5 per run, choice screen, centred lesson card |
-| `particles.js` | Sparkles and dust |
-| `audio.js` | Web Audio tones and background melody; no audio files |
-| `game.js` | State machine, lives, HUD, title / game-over / victory screens, main loop |
+| `assets.js` | Loads the PNG manifest; `Assets.sprite()` cuts a region, scales it once and caches it |
+| `obstacles.js` | Builds obstacles from `WORLD_EVENTS`, draws PNG or fallback, feet-based collision (hitbox 28×54) |
+| `player.js` | 7-pose sprite sheet drawn 96 px tall, sine jump arc, blink after a hit |
+| `demon.js` | Holds a target gap behind the player (210 → 135 px by stage), closes 40 px per mistake |
+| `background.js` | Code-drawn parallax layers per zone, ground tiles, stage gates, staircase, temple, progress bar |
+| `particles.js`, `audio.js` | Effects and Web Audio sounds, including the alarm ring |
 
-Script order in `index.html` matters: `config`, `audio`, `particles`, `assets`, `input`, `obstacles`, `demon`, `background`, `player`, `choices`, `game`.
+Sprite-sheet coordinates are in the `FRAMES` tables in `player.js` and `demon.js`; obstacle crop rectangles are in `OBSTACLE_DEFS`.
 
-## 5. Sprites
-
-Both sheets are 3168×1344 with a transparent background, poses in one row, facing right. Pose rectangles are hard-coded in a `FRAMES` table.
-
-**Player (`js/player.js`)**, drawn 96 px tall:
-
-| Pose | x | y | w | h | Used when |
-|---|---|---|---|---|---|
-| idle | 119 | 408 | 252 | 608 | At a question |
-| runA | 488 | 408 | 357 | 608 | Running, climbing |
-| runB | 937 | 421 | 397 | 595 | Running, climbing |
-| jumpUp | 1399 | 316 | 344 | 634 | Start and end of a jump |
-| jumpPeak | 1782 | 263 | 436 | 568 | Middle of a jump |
-| cheer | 2270 | 381 | 409 | 635 | Right answer, victory |
-| hurt | 2705 | 434 | 423 | 582 | Just after losing a life |
-
-**Demon (`js/demon.js`)**, drawn 112 px tall:
-
-| Pose | x | y | w | h | Used when |
-|---|---|---|---|---|---|
-| runA | 112 | 368 | 670 | 638 | Chasing |
-| runB | 849 | 368 | 682 | 632 | Chasing |
-| lunge | 1594 | 381 | 795 | 625 | Within 105 px of the player |
-| retreat | 2459 | 377 | 599 | 630 | After a right answer, and at the temple |
-
-**Obstacles (`js/obstacles.js`)**: each PNG is 1856×2304; `OBSTACLE_DEFS` holds the crop rectangle and on-screen height (about 104 px). All four share one hitbox, 28 px wide and 54 px tall.
-
-Sprites are bottom-centre anchored on the ground line. A missing PNG falls back to hand-drawn shapes.
-
-## 6. Mechanics in detail
-
-**Jump.** A sine arc, 140 px high over 26 frames. An obstacle is cleared when the player's feet are above 54 px while the two boxes overlap. At the slowest speed the timing window is about a quarter of a second, and it widens as speed rises.
-
-**Lives.** Lost on an obstacle hit, a wrong answer, or being caught by the demon. Each loss knocks the player back 200 px and gives 90 frames of invincibility.
-
-**Demon.** He holds a target distance behind the player: 210 px at the start, tightening to 120 px after five questions. Each mistake brings him 40 px closer; each right answer pushes him back. He catches the player at 45 px, but with three lives that distance is not normally reached, so in practice he is pressure rather than a second way to lose.
-
-**The V1 obstacle bug.** `obstacles.js` began with `if (!window.CONFIG) return;`. `CONFIG` is declared with `const`, and a top-level `const` is not a property of `window`, so the check always failed and no obstacle was ever created. The check is now `typeof CONFIG === 'undefined'`. Avoid `window.X` tests for any of the game's `const` modules.
-
-## 7. Backgrounds (`js/background.js`)
-
-Every layer is painted once into an off-screen canvas with a seeded random generator, then tiled each frame at its own scroll speed. Each strip is drawn three times (shifted by minus one width, zero, plus one width) when built, which makes it wrap seamlessly.
-
-| Layer | Scroll factor | Notes |
-|---|---|---|
-| Sky and sun | 0 | Colours blend between zones; the sun sinks and turns orange at the Mandir |
-| Clouds | 0.06 | Also drift slowly by themselves |
-| Hills | 0.10 | Two hazy ranges |
-| Skyline | 0.20 | Distant temple spires |
-| Mid, one per zone | 0.50 | The zone's main scenery; fountain jets are animated live |
-| Near, one per zone | 0.80 | Hedges, railings, lamp posts, diyas |
-| Ground, one per zone | 1.00 | 320 px tile: paved path plus a front verge |
-| Stairs and temple | 1.00 | Temple is painted once; flags, door glow and diya flames are live |
-
-Zone changes cross-fade over 400 px of travel centred on the boundary. To restyle a zone, edit its `mid…` and `near…` functions and its entry in `GROUNDS`.
+Script order in `index.html`: `config`, `audio`, `particles`, `assets`, `input`, `ui`, `obstacles`, `demon`, `background`, `player`, `stages`, `game`.
 
 ## 8. Testing done
 
-Run in headless Chrome from `file://` with no console errors. Automated playthroughs, driven frame by frame:
+Headless Chrome from `file://`, no console errors, at 1440×810, 1366×768, a wide short window, 390×844 (upright phone, touch) and 844×390 (phone sideways, touch).
 
 | Scenario | Result |
 |---|---|
-| Every obstacle jumped, every answer right | Victory with 3 lives, about 70 s |
-| No jumping at all | Game over after the third obstacle |
-| One wrong answer | Life lost, question re-queued clear of the next obstacle, victory with 2 lives |
-| Position during the lesson card | Unchanged for the full pause |
+| Every answer right, every obstacle jumped | Victory with 3 lives |
+| Every question answered wrong once, then right (lives raised for the test) | Every wrong card shown, run continues to victory |
+| NO to the Stage 3 upgrade | B+ card, stage cleared |
+| Three wrong answers in Stage 1 | Game over |
+| No jumping | Game over at the third obstacle |
+| Real-time keyboard run through Stage 1 | CONTINUE unavailable before 3 s; A/D answer; run resumes |
+| Tapping START and JUMP on a touch device | Starts and jumps |
 
-Not tested: the physical 3-button keyboard, touch input, and browsers other than Chrome.
+Not tested: a real phone or tablet, the physical 3-key keyboard, Safari and Firefox, and how the game feels to play by hand.
 
 ## 9. Known gaps and ideas
 
-- `assets/character/` and `assets/demon/` each hold an unused original `Gemini_Generated_Image_*.png` (about 1 MB each) that can be deleted.
-- `assets/temple/` is empty; the temple is drawn in code.
-- The lesson card cannot be skipped. A "press centre to continue" after a minimum read time would be a small change in the `moral_banner` case of `update()` in `game.js`.
-- The loop is locked to 30 fps, so motion at 7 px/frame is slightly steppy. Moving to 60 fps would mean rescaling every frame count in `config.js`.
-- The sprite PNGs are far larger than they are drawn. Shipping pre-shrunk copies would cut load size.
+- **Gujarati:** the stage text is English only. Add `guj` lines in `STAGE_DATA` once a native speaker has written them.
+- **Difficulty:** three lives cover the whole game, so three wrong answers in Stage 1 end it within seconds. Raising `MAX_LIVES`, or restoring a life when a stage is cleared, would soften this.
+- **Upright phones:** the game picture is small because it stays 16:9. Turning the phone sideways gives a much larger picture.
+- `js/choices.js` is unused and can be deleted, as can the two `Gemini_Generated_Image_*.png` originals.
+- The loop is locked to 30 fps; moving to 60 fps would mean rescaling every frame count.

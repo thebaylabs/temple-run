@@ -22,6 +22,9 @@ const Input = (() => {
     // Set to true when [right, right, left] within 45 frames; reset once read.
     let escapeTriggered = false;
 
+    // One-shot presses queued by tap()
+    const _tapped = { left: false, jump: false, right: false };
+
     const KEY_MAP = {
         // Standard A / S / D
         'KeyA': 'left',
@@ -82,6 +85,9 @@ const Input = (() => {
 
             const action = KEY_MAP[e.code];
             if (action) {
+                // _tapped guarantees a very quick press is still seen by the
+                // next game frame even if the key is already up again.
+                if (!keys[action]) _tapped[action] = true;
                 keys[action] = true;
                 e.preventDefault();
             }
@@ -100,22 +106,42 @@ const Input = (() => {
             keys.left = keys.jump = keys.right = false;
         });
 
-        // Touch / pointer support for tablets & kiosks
-        window.addEventListener('pointerdown', e => {
-            markActivity();
-            const w = window.innerWidth;
-            if (e.clientX < w * 0.33) {
-                keys.left = true;
-            } else if (e.clientX > w * 0.66) {
-                keys.right = true;
-            } else {
-                keys.jump = true;
-            }
-        });
+        // Touch / pointer: tapping the left, middle or right third of the
+        // game picture works like the three buttons. The on-screen buttons
+        // (js/ui.js) and stage screens call press()/release()/tap() directly.
+        const canvas = document.getElementById('gameCanvas');
+        if (canvas) {
+            canvas.addEventListener('pointerdown', e => {
+                markActivity();
+                const r = canvas.getBoundingClientRect();
+                const t = (e.clientX - r.left) / r.width;
+                press(t < 0.33 ? 'left' : (t > 0.66 ? 'right' : 'jump'));
+            });
+        }
 
-        window.addEventListener('pointerup', () => {
-            keys.left = keys.jump = keys.right = false;
+        window.addEventListener('pointerdown', markActivity);
+        ['pointerup', 'pointercancel'].forEach(type => {
+            window.addEventListener(type, () => {
+                keys.left = keys.jump = keys.right = false;
+            });
         });
+    }
+
+    /** Hold a button down (on-screen button pressed). */
+    function press(action) {
+        markActivity();
+        if (!keys[action]) _tapped[action] = true;
+        keys[action] = true;
+    }
+
+    function release(action) {
+        keys[action] = false;
+    }
+
+    /** One-shot press, for things that are clicked rather than held. */
+    function tap(action) {
+        markActivity();
+        _tapped[action] = true;
     }
 
     function toggleFullscreen() {
@@ -135,8 +161,9 @@ const Input = (() => {
         _frame++;
 
         for (const k of ['left', 'jump', 'right']) {
-            justPressed[k] = keys[k] && !_prev[k];
+            justPressed[k] = (keys[k] && !_prev[k]) || _tapped[k];
             _prev[k] = keys[k];
+            _tapped[k] = false;
         }
 
         // Track recently just-pressed actions for escape sequence detection
@@ -184,6 +211,9 @@ const Input = (() => {
         init,
         update,
         markActivity,
+        press,
+        release,
+        tap,
         getIdleSeconds,
         toggleFullscreen,
         consumeEscape

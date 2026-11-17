@@ -146,13 +146,17 @@ const Obstacles = (() => {
   function init() {
     obstacles = [];
     if (typeof CONFIG === 'undefined' || !CONFIG.WORLD_EVENTS) return;
+    // id: 'random' takes the next one from a shuffled pool, so two random
+    // obstacles in the same run are never the same kind.
+    const pool = Object.keys(OBSTACLE_DEFS).sort(() => Math.random() - 0.5);
     CONFIG.WORLD_EVENTS.forEach(ev => {
       if (ev.type === 'obstacle') {
-        const def = OBSTACLE_DEFS[ev.id];
+        const id = ev.id === 'random' ? pool.pop() : ev.id;
+        const def = OBSTACLE_DEFS[id];
         if (!def) return;
         obstacles.push({
           worldX:  ev.worldX,
-          id:      ev.id,
+          id:      id,
           width:   def.width,
           height:  def.height,
           cleared: false,

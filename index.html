@@ -2,39 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Annakut Family Path — Swaminarayan Hariprabodham Parivar</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: manipulation;
-        }
-        html, body {
-            width: 100%;
-            height: 100%;
-            background: #080B14;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Shruti", "Gujarati Sangam MN", sans-serif;
-        }
-        canvas {
-            image-rendering: -moz-crisp-edges;
-            image-rendering: -webkit-crisp-edges;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
-            border-radius: 4px;
-        }
-    </style>
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+
+    <!-- Stage screens (cards, questions) are drawn here by js/stages.js -->
+    <div id="overlay" class="hidden"></div>
+
+    <!-- The three game buttons. Labels are set by the game as it runs. -->
+    <div id="buttons">
+        <button class="btn btn-left off" data-action="left" type="button">
+            <span class="btn-label"></span><span class="btn-key">A / 1</span>
+        </button>
+        <button class="btn btn-jump" data-action="jump" type="button">
+            <span class="btn-label">START</span><span class="btn-key">S / 2</span>
+        </button>
+        <button class="btn btn-right off" data-action="right" type="button">
+            <span class="btn-label"></span><span class="btn-key">D / 3</span>
+        </button>
+    </div>
 
     <!-- Game Engine Scripts (Strict Dependency Order) -->
     <script src="js/config.js"></script>
@@ -42,11 +33,12 @@
     <script src="js/particles.js"></script>
     <script src="js/assets.js"></script>
     <script src="js/input.js"></script>
+    <script src="js/ui.js"></script>
     <script src="js/obstacles.js"></script>
     <script src="js/demon.js"></script>
     <script src="js/background.js"></script>
     <script src="js/player.js"></script>
-    <script src="js/choices.js"></script>
+    <script src="js/stages.js"></script>
     <script src="js/game.js"></script>
 </body>
 </html>

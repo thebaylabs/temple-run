@@ -97,6 +97,16 @@ const Sound = (() => {
         setTimeout(() => playTone(120, 'sawtooth', 0.18, 0.25, 0.01), 90);
     }
 
+    /** Alarm-clock ring for the start of Stage 1. */
+    function alarm() {
+        if (isMuted) return;
+        ensureContext();
+        if (!ctx) return;
+        for (let i = 0; i < 10; i++) {
+            setTimeout(() => playTone(i % 2 ? 1568 : 1319, 'square', 0.07, 0.12, 0.001), i * 80);
+        }
+    }
+
     function rollback() {
         if (isMuted) return;
         ensureContext();
@@ -201,6 +211,7 @@ const Sound = (() => {
         goodChoice,
         badChoice,
         rollback,
+        alarm,
         templeBell,
         victoryFanfare,
         startBGM,

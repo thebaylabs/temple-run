@@ -1,26 +1,24 @@
 // ============================================================
 // GAME — Master game state machine, auto-run, lives & kiosk loop
-// V1.1: 960×540 canvas, auto-run, jump obstacles, demon, temple stair climb
+// V1.2: auto-run between four lesson stages (js/stages.js), jump obstacles,
+//       demon, temple stair climb
 // ============================================================
 const Game = (() => {
     let canvas, ctx;
 
     // --- State ---
-    // 'title' | 'running' | 'choice' | 'moral_banner' | 'temple_climb' | 'victory' | 'game_over'
+    // 'title' | 'running' | 'stage' | 'temple_climb' | 'victory' | 'game_over'
     let state = 'title';
     let worldX = 0;
     let lives = 3;
-    let questionsAnswered = 0;
-    let moralCp = null;
-    let moralTimer = 0;
-    let celebrationTimer = 0;
+    let stagesCleared = 0;
     let stateTimer = 0;
     let frameCount = 0;
     let lastTime = 0;
     let zoneTransName = '';
     let zoneTransTimer = 0;
     let lastZoneIdx = 0;
-    let helpTextTimer = 160;
+    let helpTextTimer = 0;
     let victoryRecorded = false;
 
     // ---- Init ----
@@ -34,34 +32,22 @@ const Game = (() => {
 
         Input.init();
         Assets.init();
-        resize();
-        window.addEventListener('resize', resize);
+        UI.init(canvas);    // sizes the canvas to the window and wires the buttons
 
         lastTime = performance.now();
         requestAnimationFrame(loop);
     }
 
-    function resize() {
-        const sx = window.innerWidth / CONFIG.WIDTH;
-        const sy = window.innerHeight / CONFIG.HEIGHT;
-        const s = Math.max(1, Math.floor(Math.min(sx, sy)));
-        canvas.style.width = (CONFIG.WIDTH * s) + 'px';
-        canvas.style.height = (CONFIG.HEIGHT * s) + 'px';
-    }
-
     function resetGame() {
         worldX = 0;
         lives = CONFIG.MAX_LIVES;
-        questionsAnswered = 0;
-        moralCp = null;
-        moralTimer = 0;
-        celebrationTimer = 0;
+        stagesCleared = 0;
         stateTimer = 0;
         lastZoneIdx = 0;
-        helpTextTimer = 160;
+        helpTextTimer = 0;
         victoryRecorded = false;
 
-        Choices.randomizeSides();
+        Stages.close();
         Obstacles.init();
         Demon.init();
         Particles.reset();
@@ -75,35 +61,55 @@ const Game = (() => {
         return CONFIG.getGroundY(worldX + CONFIG.PLAYER_W / 2);
     }
 
-    /**
-     * Picks a safe spot for a question gate at or after wantX: never right
-     * before/after an obstacle (the player needs room to react when the
-     * run resumes) and never on the temple stairs.
-     */
-    function placeGate(wantX) {
-        let x = wantX;
-        Obstacles.getActivePositions().forEach(ox => {
-            if (ox > x - 200 && ox < x + 450) x = ox + 260;
-        });
-        return Math.min(x, CONFIG.STAIRS_X - 150);
-    }
-
     function loseLife(reason) {
         lives--;
-        Player.startBlink();
         if (reason !== 'caught') Demon.onPlayerMistake();
-        worldX = Math.max(0, worldX - CONFIG.ROLLBACK_DISTANCE);
         Sound.badChoice();
 
+        // A wrong answer inside a stage: the stage screen shows the lost
+        // heart and decides what happens next (see stageHooks).
+        if (reason === 'stage') return;
+
+        Player.startBlink();
+        worldX = Math.max(0, worldX - CONFIG.ROLLBACK_DISTANCE);
         const gy = playerGroundY();
         Particles.emitChoiceConfetti(CONFIG.PLAYER_X + 20, gy - 30, false);
 
-        if (lives <= 0) {
-            state = 'game_over';
-            stateTimer = 0;
-            Sound.stopBGM();
-        }
+        if (lives <= 0) gameOver();
     }
+
+    function gameOver() {
+        Stages.close();
+        state = 'game_over';
+        stateTimer = 0;
+        Sound.stopBGM();
+    }
+
+    /** Every stage gate with whether the player is already past it. */
+    function gateList() {
+        return CONFIG.STAGE_GATES.map((x, i) => ({
+            worldX: x,
+            passed: i < stagesCleared,
+            kind: i === 0 ? 'alarm' : 'toran',
+            label: 'STAGE ' + (i + 1)
+        }));
+    }
+
+    // What the stage screens (js/stages.js) are allowed to ask of the game.
+    const stageHooks = {
+        getLives: () => lives,
+        loseLife: () => { loseLife('stage'); return lives; },
+        onGameOver: () => gameOver(),
+        onClear: (index) => {
+            stagesCleared = index + 1;
+            state = 'running';
+            stateTimer = 0;
+            Player.setState('running');
+            Demon.onPlayerGoodChoice();
+            Particles.emitChoiceConfetti(CONFIG.PLAYER_X + 24, playerGroundY() - 40, true);
+            if (index === 0) helpTextTimer = 160;   // jump tip before the first obstacle
+        }
+    };
 
     // ---- Update ----
 
@@ -112,7 +118,10 @@ const Game = (() => {
         frameCount++;
 
         // Secret escape sequence: [D, D, A] resets to Title screen
-        if (Input.consumeEscape()) {
+        // (ignored while a stage question is up: answering right, right, left
+        // quickly would otherwise look exactly like the reset sequence)
+        if (Input.consumeEscape() && state !== 'stage') {
+            Stages.close();
             state = 'title';
             Sound.stopBGM();
             return;
@@ -120,6 +129,7 @@ const Game = (() => {
 
         // Kiosk Auto-Reset: 40 seconds of inactivity resets to Title screen
         if (state !== 'title' && Input.getIdleSeconds() > CONFIG.INACTIVITY_TIMEOUT_SECONDS) {
+            Stages.close();
             state = 'title';
             Sound.stopBGM();
             return;
@@ -142,21 +152,9 @@ const Game = (() => {
                 updateRunning();
                 break;
 
-            case 'moral_banner':
-                // Game is paused while the lesson card is on screen
-                moralTimer++;
-                if (moralTimer >= CONFIG.FEEDBACK_FRAMES) {
-                    state = 'running';
-                    moralCp = null;
-                    Player.setState('running');
-                }
-                break;
-
-            case 'choice':
-                stateTimer++;
-                // Choices locked until player answers Left (A) or Right (D)
-                if (Input.justPressed.left) handleChoice('left');
-                else if (Input.justPressed.right) handleChoice('right');
+            case 'stage':
+                // Run is paused; the stage screens handle the buttons.
+                Stages.update();
                 break;
 
             case 'temple_climb':
@@ -182,10 +180,24 @@ const Game = (() => {
         }
 
         if (zoneTransTimer > 0) zoneTransTimer--;
+        updateButtons();
+    }
+
+    /** Tells the on-screen buttons what they do in the current state. */
+    function updateButtons() {
+        switch (state) {
+            case 'title':      UI.setLabels(null, 'START', null); break;
+            case 'running':    UI.setLabels(null, 'JUMP', null); break;
+            case 'stage':      break;   // set by Stages.update()
+            case 'victory':    UI.setLabels(null, stateTimer > 60 ? 'PLAY AGAIN' : null, null); break;
+            case 'game_over':  UI.setLabels(null, stateTimer > 50 ? 'TRY AGAIN' : null, null); break;
+            default:           UI.setLabels(null, null, null); break;
+        }
+        UI.update();
     }
 
     function updateRunning() {
-        const speed = CONFIG.getSpeed(questionsAnswered);
+        const speed = CONFIG.getSpeed(stagesCleared);
         worldX += speed;
 
         // Jump control
@@ -203,7 +215,7 @@ const Game = (() => {
         }
 
         // Update demon
-        const demonResult = Demon.update(worldX, questionsAnswered, Player.isInvincible());
+        const demonResult = Demon.update(worldX, stagesCleared, Player.isInvincible());
         if (demonResult === 'caught') {
             loseLife('caught');
             if (state === 'game_over') return;
@@ -220,22 +232,22 @@ const Game = (() => {
             Sound.templeBell();
         }
 
-        // Check for next question gate
-        const activeQuestions = Choices.getSelected();
-        if (questionsAnswered < activeQuestions.length) {
-            const nextQ = activeQuestions[questionsAnswered];
-            if (worldX >= nextQ.worldX) {
-                worldX = nextQ.worldX;
-                state = 'choice';
+        // Reached the next stage gate: pause the run and open the stage
+        if (stagesCleared < CONFIG.STAGE_GATES.length) {
+            const gateX = CONFIG.STAGE_GATES[stagesCleared];
+            if (worldX >= gateX) {
+                worldX = gateX;
+                state = 'stage';
                 stateTimer = 0;
                 Player.setState('idle');
-                Sound.choiceAppear();
+                if (stagesCleared === 0) Sound.alarm();
+                Stages.start(stagesCleared, stageHooks);
                 return;
             }
         }
 
-        // Check for temple stairs climb trigger
-        if (questionsAnswered >= activeQuestions.length && worldX >= CONFIG.VICTORY_X) {
+        // All stages cleared: the temple stair climb
+        if (stagesCleared >= CONFIG.STAGE_GATES.length && worldX >= CONFIG.VICTORY_X) {
             worldX = CONFIG.VICTORY_X;
             state = 'temple_climb';
             stateTimer = 0;
@@ -250,7 +262,7 @@ const Game = (() => {
         stateTimer++;
         const before = playerGroundY();
         worldX += CONFIG.CLIMB_SPEED; // Majestic ascent pace
-        Demon.update(worldX, questionsAnswered, true);
+        Demon.update(worldX, stagesCleared, true);
 
         // One bell chime per stair climbed
         if (playerGroundY() !== before) {
@@ -267,46 +279,6 @@ const Game = (() => {
             if (!victoryRecorded) {
                 CONFIG.recordCompletedRun();
                 victoryRecorded = true;
-            }
-        }
-    }
-
-    function handleChoice(side) {
-        const activeQuestions = Choices.getSelected();
-        const cp = activeQuestions[questionsAnswered];
-        if (!cp) return;
-
-        const gy = playerGroundY();
-
-        if (side === cp.goodSide) {
-            questionsAnswered++;
-            cp.passed = true;
-
-            // Guarantee a fair run-up to the next question
-            const nextCp = activeQuestions[questionsAnswered];
-            if (nextCp && nextCp.worldX < worldX + CONFIG.MIN_QUESTION_GAP) {
-                nextCp.worldX = placeGate(worldX + CONFIG.MIN_QUESTION_GAP);
-            }
-
-            moralCp = cp;
-            moralTimer = 0;
-            state = 'moral_banner';
-
-            Player.setState('celebrating');
-
-            Sound.goodChoice();
-            Demon.onPlayerGoodChoice();
-            Particles.emitChoiceConfetti(CONFIG.PLAYER_X + 24, gy - 40, true);
-        } else {
-            loseLife('wrong_answer');
-
-            // Reposition the question gate further ahead so player must try it again
-            cp.worldX = placeGate(worldX + CONFIG.WRONG_ANSWER_REGATE);
-            Choices.randomizeOneSide(questionsAnswered);
-
-            if (state !== 'game_over') {
-                state = 'running';
-                Player.setState('running');
             }
         }
     }
@@ -343,7 +315,7 @@ const Game = (() => {
         Background.render(
             ctx,
             worldX,
-            Choices.getSelected(),
+            gateList(),
             Demon.getDemonWorldX(),
             Demon.warningLevel,
             frameCount
@@ -364,18 +336,7 @@ const Game = (() => {
         // 6. HUD (Lives, Score, Zone Banner)
         renderHUD();
 
-        // 7. Dilemma / Choice UI
-        if (state === 'choice') {
-            const activeQuestions = Choices.getSelected();
-            Choices.renderChoiceUI(ctx, activeQuestions[questionsAnswered], stateTimer);
-        }
-
-        // 8. 5-Second Moral Reflection Banner
-        if (state === 'moral_banner' && moralCp) {
-            Choices.renderMoralBanner(ctx, moralCp, moralTimer);
-        }
-
-        // 9. Jump tutorial prompt (first few seconds of game)
+        // 7. Jump tip (shown after Stage 1, before the first obstacle)
         if (helpTextTimer > 0 && state === 'running') {
             const alpha = helpTextTimer > 120 ? Math.min(1, (160 - helpTextTimer) / 40) : helpTextTimer / 120;
             ctx.save();
@@ -390,7 +351,7 @@ const Game = (() => {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = '#FFD700';
-            ctx.fillText('Press [S / 2] or Center to JUMP!  ⬆️', CONFIG.WIDTH / 2, 104);
+            ctx.fillText('Press the JUMP button to jump!  ⬆️', CONFIG.WIDTH / 2, 104);
             ctx.restore();
         }
     }
@@ -419,14 +380,15 @@ const Game = (() => {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(`QUESTIONS: ${questionsAnswered} / ${Choices.getSelected().length || 5}`, scoreX + scoreW / 2, scoreY + scoreH / 2);
+        ctx.fillText(`STAGE ${Math.min(stagesCleared + 1, Stages.count)} / ${Stages.count}`, scoreX + scoreW / 2, scoreY + scoreH / 2);
 
-        // --- Controls / Booth Legend (Bottom-Left) ---
-        ctx.font = '10px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.fillText(Sound.isMuted ? '[M] Sound: OFF' : '[M] Sound: ON', 20, CONFIG.HEIGHT - 28);
-        ctx.fillText('[F] Fullscreen  |  [D-D-A] Reset', 20, CONFIG.HEIGHT - 12);
+        // --- Mute indicator (under the hearts) ---
+        if (Sound.isMuted) {
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillText('[M] Sound: OFF', 24, 58);
+        }
 
         // --- Zone Announcement Banner ---
         if (zoneTransTimer > 0) {
@@ -536,25 +498,28 @@ const Game = (() => {
 
         ctx.font = 'bold 15px monospace';
         ctx.fillStyle = '#38BDF8';
-        ctx.fillText('Left [A / 1]    Jump [S / 2 / Center]    Right [D / 3]', CONFIG.WIDTH / 2, by + 18);
+        ctx.fillText('Left [A / 1]    Jump [S / 2 / Center]    Right [D / 3]', CONFIG.WIDTH / 2, by + 10);
+        ctx.font = '12px monospace';
+        ctx.fillStyle = '#94A3B8';
+        ctx.fillText('[F] Fullscreen     [M] Sound on/off', CONFIG.WIDTH / 2, by + 33);
 
         // Start Prompt
         if (Math.sin(frameCount * 0.1) > -0.2) {
             ctx.font = 'bold 20px monospace';
             ctx.fillStyle = '#FFD700';
-            ctx.fillText('>> Press [S / 2] or Center Button to Start <<', CONFIG.WIDTH / 2, 330);
+            ctx.fillText('>> Press START to begin <<', CONFIG.WIDTH / 2, 330);
         }
 
         // Features badge
         ctx.font = '12px "Segoe UI", Arial, sans-serif';
         ctx.fillStyle = '#CBD5E1';
-        ctx.fillText('⚡ Auto-Run  •  3 Lives  •  Jump Obstacles  •  Distraction Demon Chaser', CONFIG.WIDTH / 2, 390);
+        ctx.fillText('⚡ 4 Stages  •  3 Lives  •  Jump the Obstacles  •  Outrun the Distraction Demon', CONFIG.WIDTH / 2, 390);
 
         // Booth pilgrim count
         const runs = CONFIG.getBoothRuns();
         ctx.font = '13px "Segoe UI", Arial, sans-serif';
         ctx.fillStyle = '#F59E0B';
-        ctx.fillText(`Booth Pilgrims Completed Today: ${runs}`, CONFIG.WIDTH / 2, CONFIG.HEIGHT - 40);
+        ctx.fillText(`Booth Pilgrims Completed Today: ${runs}`, CONFIG.WIDTH / 2, 424);
     }
 
     // ---- Victory Screen ----
@@ -584,10 +549,10 @@ const Game = (() => {
         ctx.font = 'bold 22px monospace';
         if (lives === 3) {
             ctx.fillStyle = '#00FF88';
-            ctx.fillText(`🌟 PERFECT PILGRIMAGE: 5 / 5 (3 LIVES REMAINING)! 🌟`, CONFIG.WIDTH / 2, 130);
+            ctx.fillText(`🌟 PERFECT PILGRIMAGE: ALL ${Stages.count} STAGES, 3 LIVES LEFT! 🌟`, CONFIG.WIDTH / 2, 130);
         } else {
             ctx.fillStyle = '#FFD700';
-            ctx.fillText(`PILGRIMAGE COMPLETED: 5 / 5 (${lives} LIVES REMAINING)`, CONFIG.WIDTH / 2, 130);
+            ctx.fillText(`PILGRIMAGE COMPLETED: ALL ${Stages.count} STAGES (${lives} ${lives === 1 ? 'LIFE' : 'LIVES'} LEFT)`, CONFIG.WIDTH / 2, 130);
         }
 
         // Family Blessing Message
@@ -604,7 +569,7 @@ const Game = (() => {
         if (stateTimer > 60 && Math.sin(frameCount * 0.09) > -0.2) {
             ctx.font = 'bold 18px monospace';
             ctx.fillStyle = '#FFFFFF';
-            ctx.fillText('>> Press [S / 2] to Play Again for Next Pilgrim <<', CONFIG.WIDTH / 2, CONFIG.HEIGHT - 60);
+            ctx.fillText('>> Press PLAY AGAIN for the next pilgrim <<', CONFIG.WIDTH / 2, 410);
         }
     }
 
@@ -626,7 +591,7 @@ const Game = (() => {
 
         ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(`Questions Answered: ${questionsAnswered} / 5`, CONFIG.WIDTH / 2, 120);
+        ctx.fillText(`Stages Cleared: ${stagesCleared} / ${Stages.count}`, CONFIG.WIDTH / 2, 120);
 
         ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
         ctx.fillStyle = '#FDE68A';
@@ -638,7 +603,7 @@ const Game = (() => {
         if (stateTimer > 45 && Math.sin(frameCount * 0.09) > -0.2) {
             ctx.font = 'bold 18px monospace';
             ctx.fillStyle = '#FFD700';
-            ctx.fillText('>> Press [S / 2] to Try Again <<', CONFIG.WIDTH / 2, CONFIG.HEIGHT - 80);
+            ctx.fillText('>> Press TRY AGAIN <<', CONFIG.WIDTH / 2, 400);
         }
     }
 
