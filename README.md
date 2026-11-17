@@ -1,4 +1,4 @@
-# 🎮 Annakut Family Path (V1.2) — Swaminarayan Hariprabodham Parivar
+# 🎮 Annakut Temple Run (V1.2) — Swaminarayan Hariprabodham Parivar
 
 An 8-bit retro auto-runner about family harmony, right choices and devotion, built for the Annakut festival booth. The player runs through five Akshardham-inspired zones, jumps over distractions and vices, works through four lesson stages, and climbs the steps of the Mandir.
 
