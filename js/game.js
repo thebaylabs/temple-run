@@ -1,6 +1,6 @@
 // ============================================================
 // GAME — Master game state machine, auto-run, lives & kiosk loop
-// V1: 960×540 canvas, auto-run, jump obstacles, demon, temple climb
+// V1.1: 960×540 canvas, auto-run, jump obstacles, demon, temple stair climb
 // ============================================================
 const Game = (() => {
     let canvas, ctx;
@@ -70,14 +70,32 @@ const Game = (() => {
         Sound.startBGM();
     }
 
-    function loseLife() {
+    /** Ground height under the player's feet (sprite centre). */
+    function playerGroundY() {
+        return CONFIG.getGroundY(worldX + CONFIG.PLAYER_W / 2);
+    }
+
+    /**
+     * Picks a safe spot for a question gate at or after wantX: never right
+     * before/after an obstacle (the player needs room to react when the
+     * run resumes) and never on the temple stairs.
+     */
+    function placeGate(wantX) {
+        let x = wantX;
+        Obstacles.getActivePositions().forEach(ox => {
+            if (ox > x - 200 && ox < x + 450) x = ox + 260;
+        });
+        return Math.min(x, CONFIG.STAIRS_X - 150);
+    }
+
+    function loseLife(reason) {
         lives--;
         Player.startBlink();
-        Demon.onPlayerHit(worldX);
+        if (reason !== 'caught') Demon.onPlayerMistake();
         worldX = Math.max(0, worldX - CONFIG.ROLLBACK_DISTANCE);
         Sound.badChoice();
 
-        const gy = CONFIG.getGroundY(worldX);
+        const gy = playerGroundY();
         Particles.emitChoiceConfetti(CONFIG.PLAYER_X + 20, gy - 30, false);
 
         if (lives <= 0) {
@@ -121,8 +139,17 @@ const Game = (() => {
                 break;
 
             case 'running':
-            case 'moral_banner':
                 updateRunning();
+                break;
+
+            case 'moral_banner':
+                // Game is paused while the lesson card is on screen
+                moralTimer++;
+                if (moralTimer >= CONFIG.FEEDBACK_FRAMES) {
+                    state = 'running';
+                    moralCp = null;
+                    Player.setState('running');
+                }
                 break;
 
             case 'choice':
@@ -166,27 +193,19 @@ const Game = (() => {
             Player.startJump();
         }
 
-        // Celebration timer decay back to running
-        if (celebrationTimer > 0) {
-            celebrationTimer--;
-            if (celebrationTimer === 0 && !Player.isJumping()) {
-                Player.setState('running');
-            }
-        }
-
-        const groundY = CONFIG.getGroundY(worldX);
+        const groundY = playerGroundY();
 
         // Check obstacle collision
         const hitObstacle = Obstacles.checkPlayerCollision(worldX, Player.getYOffset(), groundY);
         if (hitObstacle && !Player.isInvincible()) {
-            loseLife();
+            loseLife('obstacle');
             if (state === 'game_over') return;
         }
 
         // Update demon
-        const demonResult = Demon.update(worldX, speed, questionsAnswered);
-        if (demonResult === 'caught' && !Player.isInvincible()) {
-            loseLife();
+        const demonResult = Demon.update(worldX, questionsAnswered, Player.isInvincible());
+        if (demonResult === 'caught') {
+            loseLife('caught');
             if (state === 'game_over') return;
         }
 
@@ -209,38 +228,32 @@ const Game = (() => {
                 worldX = nextQ.worldX;
                 state = 'choice';
                 stateTimer = 0;
-                Player.setState('running');
+                Player.setState('idle');
                 Sound.choiceAppear();
                 return;
             }
         }
 
         // Check for temple stairs climb trigger
-        if (questionsAnswered >= 5 && worldX >= CONFIG.VICTORY_X) {
+        if (questionsAnswered >= activeQuestions.length && worldX >= CONFIG.VICTORY_X) {
             worldX = CONFIG.VICTORY_X;
             state = 'temple_climb';
             stateTimer = 0;
             Player.setState('climbing');
-            Demon.onPlayerGoodChoice(); // Demon retreats off-screen
+            Demon.banish(); // Demon falls away and fades out
             Sound.templeBell();
             return;
-        }
-
-        // Moral banner countdown (runs concurrently with running state)
-        if (state === 'moral_banner') {
-            moralTimer++;
-            if (moralTimer >= CONFIG.FEEDBACK_FRAMES) {
-                state = 'running';
-                moralCp = null;
-            }
         }
     }
 
     function updateTempleClimb() {
         stateTimer++;
-        worldX += 1.4; // Majestic ascent pace
+        const before = playerGroundY();
+        worldX += CONFIG.CLIMB_SPEED; // Majestic ascent pace
+        Demon.update(worldX, questionsAnswered, true);
 
-        if (stateTimer % 45 === 0) {
+        // One bell chime per stair climbed
+        if (playerGroundY() !== before) {
             Sound.templeBell();
         }
 
@@ -263,32 +276,37 @@ const Game = (() => {
         const cp = activeQuestions[questionsAnswered];
         if (!cp) return;
 
-        const gy = CONFIG.getGroundY(worldX);
+        const gy = playerGroundY();
 
         if (side === cp.goodSide) {
             questionsAnswered++;
             cp.passed = true;
+
+            // Guarantee a fair run-up to the next question
+            const nextCp = activeQuestions[questionsAnswered];
+            if (nextCp && nextCp.worldX < worldX + CONFIG.MIN_QUESTION_GAP) {
+                nextCp.worldX = placeGate(worldX + CONFIG.MIN_QUESTION_GAP);
+            }
+
             moralCp = cp;
             moralTimer = 0;
             state = 'moral_banner';
 
             Player.setState('celebrating');
-            celebrationTimer = 40;
 
             Sound.goodChoice();
             Demon.onPlayerGoodChoice();
             Particles.emitChoiceConfetti(CONFIG.PLAYER_X + 24, gy - 40, true);
         } else {
-            loseLife();
-            Sound.badChoice();
-            Demon.onPlayerBadChoice();
+            loseLife('wrong_answer');
 
             // Reposition the question gate further ahead so player must try it again
-            cp.worldX = worldX + 320;
+            cp.worldX = placeGate(worldX + CONFIG.WRONG_ANSWER_REGATE);
             Choices.randomizeOneSide(questionsAnswered);
 
             if (state !== 'game_over') {
                 state = 'running';
+                Player.setState('running');
             }
         }
     }
@@ -319,7 +337,7 @@ const Game = (() => {
     function renderGameWorld() {
         const cameraX = Math.max(0, worldX - CONFIG.PLAYER_X);
         const playerScreenX = CONFIG.PLAYER_X;
-        const groundY = CONFIG.getGroundY(worldX);
+        const groundY = playerGroundY();
 
         // 1. Parallax background, terrain & temple
         Background.render(
@@ -358,7 +376,7 @@ const Game = (() => {
         }
 
         // 9. Jump tutorial prompt (first few seconds of game)
-        if (helpTextTimer > 0 && (state === 'running' || state === 'moral_banner')) {
+        if (helpTextTimer > 0 && state === 'running') {
             const alpha = helpTextTimer > 120 ? Math.min(1, (160 - helpTextTimer) / 40) : helpTextTimer / 120;
             ctx.save();
             ctx.globalAlpha = alpha * 0.92;
@@ -401,7 +419,7 @@ const Game = (() => {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(`QUESTIONS: ${questionsAnswered} / 5`, scoreX + scoreW / 2, scoreY + scoreH / 2);
+        ctx.fillText(`QUESTIONS: ${questionsAnswered} / ${Choices.getSelected().length || 5}`, scoreX + scoreW / 2, scoreY + scoreH / 2);
 
         // --- Controls / Booth Legend (Bottom-Left) ---
         ctx.font = '10px monospace';

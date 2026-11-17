@@ -1,204 +1,169 @@
-// demon.js — Social Media Demon "Vikshep" for Annakut Family Path V1
+// demon.js — Social Media Demon "Vikshep" for Annakut Family Path V1.1
+//
+// The demon keeps a target distance behind the player that tightens with
+// every question answered, so it is always on screen breathing down the
+// player's neck. Mistakes let it close in; good answers push it back.
 
 const Demon = (() => {
-  const PHASE_MULTIPLIERS = [0.85, 0.90, 0.94, 0.97];
+  // Target gap (px, demon centre → player centre) by questions answered
+  const TARGET_GAP   = [210, 190, 170, 150, 135, 120];
+  const MISTAKE_GAIN = 40;    // demon closes in this much per mistake
+  const GOOD_PUSH    = 40;    // and is pushed back this much per good answer
+  const CATCH_GAP    = 45;
+  const START_GAP    = 420;   // starts off-screen and runs in
+
+  // Sprite sheet (assets/demon/demon_sheet.png, 3168×1344): [x, y, w, h]
+  const SPRITE_H = 112;
+  const SPRITE_SCALE = SPRITE_H / 638;
+  const FRAMES = {
+    runA:    [112,  368, 670, 638],
+    runB:    [849,  368, 682, 632],
+    lunge:   [1594, 381, 795, 625],
+    retreat: [2459, 377, 599, 630],
+  };
 
   // ── state ─────────────────────────────────────────────────────────────────
-  let demonWorldX   = -480;
-  let phase         = 0;
-  let retreatTimer  = 0;
-  let caughtPlayer  = false;
-  let animTick      = 0;
-  let _playerWorldX = 0; // stored for warningLevel
-
-  // ── init / reset ──────────────────────────────────────────────────────────
+  let gap          = START_GAP;
+  let penalty      = 0;       // accumulated closeness from mistakes
+  let retreatTimer = 0;
+  let banished     = false;
+  let fade         = 1;
+  let animTick     = 0;
+  let demonWorldX  = -START_GAP;
 
   function init() {
-    demonWorldX  = -480;
-    phase        = 0;
+    gap          = START_GAP;
+    penalty      = 0;
     retreatTimer = 0;
-    caughtPlayer = false;
+    banished     = false;
+    fade         = 1;
     animTick     = 0;
-    _playerWorldX = 0;
+    demonWorldX  = -START_GAP;
   }
 
-  // ── lifecycle ─────────────────────────────────────────────────────────────
-
   /**
-   * update(playerWorldX, playerSpeed, questionsAnswered)
-   * Returns 'caught' if demon catches player, else null.
+   * update(playerWorldX, questionsAnswered, playerInvincible)
+   * playerWorldX is the left edge of the player sprite.
+   * Returns 'caught' if the demon reaches the player, else null.
    */
-  function update(playerWorldX, playerSpeed, questionsAnswered) {
-    _playerWorldX = playerWorldX;
+  function update(playerWorldX, questionsAnswered, playerInvincible) {
     animTick++;
+    const playerCentre = playerWorldX + CONFIG.PLAYER_W / 2;
 
-    phase = Math.min(questionsAnswered, 3);
-    const demonSpeed = playerSpeed * PHASE_MULTIPLIERS[phase];
-
-    if (retreatTimer > 0) {
-      retreatTimer--;
-      demonWorldX += demonSpeed * 0.5;
-    } else {
-      demonWorldX += demonSpeed;
+    if (banished) {
+      gap += 6;
+      fade = Math.max(0, fade - 0.04);
+      demonWorldX = playerCentre - gap;
+      return null;
     }
 
-    const gap = playerWorldX - demonWorldX;
+    if (retreatTimer > 0) retreatTimer--;
 
-    if (gap < 20 && retreatTimer === 0) {
-      // Caught — reset demon position but signal the event
-      demonWorldX = playerWorldX - 480;
-      caughtPlayer = true;
+    const q = Math.min(questionsAnswered, TARGET_GAP.length - 1);
+    let target = TARGET_GAP[q] - penalty;
+    // Never crowd the player while they are still blinking from a hit
+    if (playerInvincible) target = Math.max(target, 90);
+    gap += (target - gap) * 0.04;
+    demonWorldX = playerCentre - gap;
+
+    if (gap <= CATCH_GAP && !playerInvincible) {
+      penalty = 0;
+      gap = 260;
+      demonWorldX = playerCentre - gap;
       return 'caught';
     }
-
-    caughtPlayer = false;
     return null;
   }
 
+  /** Right answer: demon is pushed back. */
   function onPlayerGoodChoice() {
-    demonWorldX   -= 80;
-    retreatTimer   = 25;
+    penalty = Math.max(0, penalty - GOOD_PUSH);
+    gap += 70;
+    retreatTimer = 30;
   }
 
-  function onPlayerBadChoice() {
-    demonWorldX += 150;
+  /** Wrong answer or obstacle hit: demon closes in. */
+  function onPlayerMistake() {
+    penalty += MISTAKE_GAIN;
   }
 
-  /**
-   * onPlayerHit(playerWorldX)
-   * Called when player loses a life to an obstacle.
-   */
-  function onPlayerHit(playerWorldX) {
-    if (typeof playerWorldX === 'number') {
-      demonWorldX = playerWorldX - 480;
-    } else {
-      demonWorldX -= 300;
-    }
-  }
+  // Kept for compatibility with older callers
+  function onPlayerBadChoice() { onPlayerMistake(); }
+  function onPlayerHit() { onPlayerMistake(); }
 
-  function storePlayerX(x) {
-    _playerWorldX = x;
+  /** Temple reached: demon falls away and fades out. */
+  function banish() {
+    banished = true;
+    retreatTimer = 9999;
   }
 
   function getDemonWorldX() {
     return demonWorldX;
   }
 
-  // ── warning level ─────────────────────────────────────────────────────────
-
   function getWarningLevel() {
-    const gap = _playerWorldX - demonWorldX;
-    if (gap < 150) return 2;
-    if (gap < 300) return 1;
+    if (banished) return 0;
+    if (gap < 100) return 2;
+    if (gap < 140) return 1;
     return 0;
   }
 
   // ── rendering ─────────────────────────────────────────────────────────────
 
-  /**
-   * render(ctx, cameraX, getGroundY)
-   */
   function render(ctx, cameraX, getGroundY) {
-    const WIDTH   = (window.CONFIG && CONFIG.WIDTH)  ? CONFIG.WIDTH  : 960;
-    const sx      = demonWorldX - cameraX;
-
-    if (sx < -60 || sx > WIDTH + 30) return;
-
+    if (fade <= 0) return;
+    const sx = Math.round(demonWorldX - cameraX);
+    if (sx < -120 || sx > CONFIG.WIDTH + 60) return;
     const groundY = getGroundY(demonWorldX);
-    const DW      = 52;   // demon body width
-    const DH      = 100;  // demon body height
 
-    // 4-frame running: arms/legs swap every 5 ticks
-    const runFrame = Math.floor(animTick / 5) % 4;
+    let name;
+    if (retreatTimer > 0) name = 'retreat';
+    else if (gap < 105) name = 'lunge';
+    else name = (Math.floor(animTick / 4) % 2 === 0) ? 'runA' : 'runB';
 
-    // Eye pulse
-    const eyeAlpha = 0.7 + 0.3 * Math.sin(animTick * 0.15);
+    const r = FRAMES[name];
+    const sprite = Assets.sprite('DEMON_SHEET', r, r[3] * SPRITE_SCALE);
 
     ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(sx - 32, groundY - 2, 64, 6);
 
-    // Retreat: scale smaller and fade
-    if (retreatTimer > 0) {
-      ctx.globalAlpha = 0.6;
-      ctx.translate(sx, groundY);
-      ctx.scale(0.85, 0.85);
-      ctx.translate(-sx, -groundY);
+    if (sprite) {
+      const bob = (name === 'runA' || name === 'runB') ? (Math.floor(animTick / 4) % 2) * 2 : 0;
+      ctx.drawImage(sprite, Math.round(sx - sprite.width / 2), groundY - sprite.height + 3 - bob);
+    } else {
+      drawFallback(ctx, sx, groundY);
     }
-
-    // ── Dark flowing cloak (behind body) ─────────────────────────────────
-    // 3 dark rects slightly offset for jagged cloak bottom
-    ctx.fillStyle = '#2A004A';
-    ctx.fillRect(sx - DW / 2 - 4, groundY - DH - 10, DW + 8, DH + 10);
-    ctx.fillStyle = '#1A0030';
-    ctx.fillRect(sx - DW / 2 - 2 + runFrame, groundY - 24, 14, 24);
-    ctx.fillRect(sx - DW / 2 + 10,           groundY - 20, 12, 20);
-    ctx.fillRect(sx - DW / 2 + 22 - runFrame, groundY - 22, 14, 22);
-
-    // ── Main body ─────────────────────────────────────────────────────────
-    ctx.fillStyle = '#4A0070';
-    ctx.fillRect(sx - DW / 2, groundY - DH, DW, DH);
-
-    // ── Arms / legs animation ─────────────────────────────────────────────
-    ctx.fillStyle = '#4A0070';
-    // Arms
-    const armSwing = (runFrame % 2 === 0) ? 1 : -1;
-    ctx.fillRect(sx - DW / 2 - 10, groundY - DH + 10 + armSwing * 6, 10, 28);
-    ctx.fillRect(sx + DW / 2,       groundY - DH + 10 - armSwing * 6, 10, 28);
-    // Legs
-    const legSwing = (runFrame % 2 === 0) ? 1 : -1;
-    ctx.fillRect(sx - 16, groundY - 32 + legSwing * 5,  14, 32);
-    ctx.fillRect(sx + 2,  groundY - 32 - legSwing * 5,  14, 32);
-
-    // ── Cyan glowing phone in right hand ─────────────────────────────────
-    const phoneX = sx + DW / 2 + 2;
-    const phoneY = groundY - DH + 30 - armSwing * 6;
-    // glow
-    ctx.shadowBlur  = 12;
-    ctx.shadowColor = '#00F2EA';
-    ctx.fillStyle   = '#00F2EA';
-    ctx.fillRect(phoneX, phoneY, 12, 20);
-    ctx.shadowBlur  = 0;
-    ctx.shadowColor = 'transparent';
-    // screen glint
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.fillRect(phoneX + 2, phoneY + 2, 4, 6);
-
-    // ── Glowing eyes ─────────────────────────────────────────────────────
-    ctx.globalAlpha = (retreatTimer > 0) ? 0.6 * eyeAlpha : eyeAlpha;
-    ctx.shadowBlur  = 10;
-    ctx.shadowColor = '#FF00FF';
-    ctx.fillStyle   = '#FF00FF';
-    ctx.fillRect(sx - 14, groundY - DH + 18, 10, 8);
-    ctx.fillRect(sx + 4,  groundY - DH + 18, 10, 8);
-    ctx.shadowBlur  = 0;
-    ctx.shadowColor = 'transparent';
-    ctx.globalAlpha = (retreatTimer > 0) ? 0.6 : 1.0;
-
-    // ── 3 floating notification icons ─────────────────────────────────────
-    const icons = [
-      { dx: -18, dy: -28, sym: '♥', color: '#FF4D88' },
-      { dx:  20, dy: -40, sym: '🔔', color: '#FFD700' },
-      { dx:  -4, dy: -54, sym: '👍', color: '#4FC3F7' },
-    ];
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    icons.forEach((ic, i) => {
-      const bobY = Math.sin(animTick * 0.12 + i * 1.2) * 5;
-      ctx.fillStyle = ic.color;
-      ctx.fillText(ic.sym, sx + ic.dx, groundY - DH + ic.dy + bobY);
-    });
-
     ctx.restore();
   }
 
-  // ── public API ────────────────────────────────────────────────────────────
+  /** Simple hand-drawn demon used if demon_sheet.png is missing. */
+  function drawFallback(ctx, sx, groundY) {
+    const DW = 52, DH = 100;
+    const step = (Math.floor(animTick / 5) % 2 === 0) ? 1 : -1;
+    ctx.fillStyle = '#2A004A';
+    ctx.fillRect(sx - DW / 2 - 4, groundY - DH - 10, DW + 8, DH - 14);
+    ctx.fillStyle = '#4A0070';
+    ctx.fillRect(sx - DW / 2, groundY - DH, DW, DH - 30);
+    ctx.fillRect(sx - 16, groundY - 32 + step * 5, 14, 32);
+    ctx.fillRect(sx + 2,  groundY - 32 - step * 5, 14, 32);
+    ctx.fillRect(sx + DW / 2, groundY - DH + 10 - step * 6, 10, 28);
+    ctx.fillStyle = '#00F2EA';
+    ctx.fillRect(sx + DW / 2 + 2, groundY - DH + 30 - step * 6, 12, 20);
+    ctx.fillStyle = '#FF00FF';
+    ctx.fillRect(sx - 14, groundY - DH + 18, 10, 8);
+    ctx.fillRect(sx + 4,  groundY - DH + 18, 10, 8);
+  }
 
   return {
     init,
     update,
     onPlayerGoodChoice,
     onPlayerBadChoice,
+    onPlayerMistake,
     onPlayerHit,
-    storePlayerX,
+    banish,
     getDemonWorldX,
     get warningLevel() { return getWarningLevel(); },
     render,

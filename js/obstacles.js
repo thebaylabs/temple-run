@@ -1,12 +1,20 @@
 // obstacles.js — Jump obstacle manager for Annakut Family Path V1
 // 4 obstacle types: instagram, tiktok, bottle, cigarette
 
+// key  = image in the Assets manifest
+// src  = [x, y, w, h] of the artwork inside its 1856×2304 PNG
+// drawH = height on screen; width/height = fallback rectangle art size
 const OBSTACLE_DEFS = {
-  instagram: { width: 52, height: 110 },
-  tiktok:    { width: 48, height: 110 },
-  bottle:    { width: 38, height: 120 },
-  cigarette: { width: 44, height: 130 },
+  instagram: { key: 'OBS_INSTAGRAM', src: [345, 173, 1213, 1910], drawH: 104, width: 52, height: 100 },
+  tiktok:    { key: 'OBS_TIKTOK',    src: [252, 13,  1375, 2256], drawH: 104, width: 48, height: 100 },
+  bottle:    { key: 'OBS_BOTTLE',    src: [374, 148, 1109, 2080], drawH: 104, width: 38, height: 100 },
+  cigarette: { key: 'OBS_CIGARETTE', src: [461, 45,  1008, 2241], drawH: 112, width: 44, height: 100 },
 };
+
+// One forgiving hitbox for every obstacle: the solid lower core of the art.
+// A jump clears it once the player's feet are above OBSTACLE_HIT_H.
+const OBSTACLE_HIT_W = 28;
+const OBSTACLE_HIT_H = 54;
 
 const Obstacles = (() => {
   let obstacles = [];
@@ -137,7 +145,7 @@ const Obstacles = (() => {
 
   function init() {
     obstacles = [];
-    if (!window.CONFIG || !CONFIG.WORLD_EVENTS) return;
+    if (typeof CONFIG === 'undefined' || !CONFIG.WORLD_EVENTS) return;
     CONFIG.WORLD_EVENTS.forEach(ev => {
       if (ev.type === 'obstacle') {
         const def = OBSTACLE_DEFS[ev.id];
@@ -157,58 +165,90 @@ const Obstacles = (() => {
     init();
   }
 
+  /** World X of every obstacle the player has not hit yet. */
+  function getActivePositions() {
+    return obstacles.filter(o => !o.cleared).map(o => o.worldX);
+  }
+
   /**
-   * render(ctx, cameraX, getGroundY)
-   * Draws all non-cleared obstacles visible on screen.
+   * render(ctx, cameraX, getGroundY, animTick)
+   * Draws all non-cleared obstacles visible on screen, using the PNG art
+   * when it has loaded and the hand-drawn version otherwise.
    */
   function render(ctx, cameraX, getGroundY, animTick) {
-    const WIDTH = (window.CONFIG && CONFIG.WIDTH) ? CONFIG.WIDTH : 960;
+    const WIDTH = CONFIG.WIDTH;
+    const tick = animTick || 0;
     obstacles.forEach(obs => {
       if (obs.cleared) return;
-      const sx = obs.worldX - cameraX;
-      if (sx < -obs.width - 10 || sx > WIDTH + obs.width + 10) return;
+      const sx = Math.round(obs.worldX - cameraX);
+      if (sx < -120 || sx > WIDTH + 120) return;
       const groundY = getGroundY(obs.worldX);
+      const def = OBSTACLE_DEFS[obs.id];
+      const img = Assets.sprite(def.key, def.src, def.drawH);
 
       ctx.save();
-      switch (obs.id) {
-        case 'instagram': _drawInstagram(ctx, sx, groundY); break;
-        case 'tiktok':    _drawTiktok(ctx, sx, groundY);    break;
-        case 'bottle':    _drawBottle(ctx, sx, groundY);    break;
-        case 'cigarette': _drawCigarette(ctx, sx, groundY, animTick || 0); break;
+      // Ground shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.fillRect(sx - 30, groundY - 2, 60, 6);
+
+      let topY;
+      if (img) {
+        topY = groundY - img.height + 4;
+        ctx.drawImage(img, sx - Math.round(img.width / 2), topY);
+      } else {
+        topY = groundY - def.height - 20;
+        switch (obs.id) {
+          case 'instagram': _drawInstagram(ctx, sx, groundY); break;
+          case 'tiktok':    _drawTiktok(ctx, sx, groundY);    break;
+          case 'bottle':    _drawBottle(ctx, sx, groundY);    break;
+          case 'cigarette': _drawCigarette(ctx, sx, groundY, tick); break;
+        }
       }
+
+      // Bouncing "jump!" arrow above the obstacle so it reads as a hazard,
+      // not as scenery.
+      const bob = Math.round(Math.sin(tick * 0.25) * 4);
+      const ay = topY - 22 + bob;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(sx - 5, ay - 2, 10, 12);
+      ctx.fillRect(sx - 11, ay + 8, 22, 4);
+      ctx.fillRect(sx - 7, ay + 12, 14, 4);
+      ctx.fillRect(sx - 3, ay + 16, 6, 4);
+      ctx.fillStyle = '#FFD700';
+      ctx.fillRect(sx - 3, ay, 6, 10);
+      ctx.fillRect(sx - 9, ay + 8, 18, 2);
+      ctx.fillRect(sx - 7, ay + 10, 14, 2);
+      ctx.fillRect(sx - 5, ay + 12, 10, 2);
+      ctx.fillRect(sx - 3, ay + 14, 6, 2);
+      ctx.fillRect(sx - 1, ay + 16, 2, 2);
       ctx.restore();
     });
   }
 
   /**
    * checkPlayerCollision(playerWorldX, playerJumpYOffset, groundY)
-   * Returns collided obstacle object (and marks it cleared) or null.
-   * playerJumpYOffset: negative = up (e.g. -130 at peak of jump)
+   * playerWorldX is the LEFT edge of the player sprite (same as Game.worldX).
+   * playerJumpYOffset: negative = up (e.g. -140 at the peak of a jump).
+   * Returns the collided obstacle (and marks it cleared) or null.
    */
   function checkPlayerCollision(playerWorldX, playerJumpYOffset, groundY) {
+    const pCentre = playerWorldX + CONFIG.PLAYER_W / 2;
+    const pLeft   = pCentre - 12;
+    const pRight  = pCentre + 12;
+    const feetY   = groundY + playerJumpYOffset;
+
     for (let i = 0; i < obstacles.length; i++) {
       const obs = obstacles[i];
       if (obs.cleared) continue;
 
-      // Player AABB
-      const pLeft   = playerWorldX - 18;
-      const pRight  = playerWorldX + 18;
-      const pBottom = groundY;
-      const pTop    = groundY - 72 + playerJumpYOffset;
+      const obsLeft  = obs.worldX - OBSTACLE_HIT_W / 2;
+      const obsRight = obs.worldX + OBSTACLE_HIT_W / 2;
+      const obsTop   = groundY - OBSTACLE_HIT_H;
 
-      // Obstacle AABB (using its own groundY via stored worldX — caller passes generic groundY;
-      // for per-obstacle groundY accuracy, use the same groundY the caller computed or the render path)
-      const obsLeft   = obs.worldX - obs.width / 2;
-      const obsRight  = obs.worldX + obs.width / 2;
-      const obsBottom = groundY;
-      const obsTop    = groundY - obs.height;
-
-      // X overlap
       const xOverlap = pRight > obsLeft && pLeft < obsRight;
-      // Y: player is NOT fully above obstacle
-      const notAbove = pTop > obsTop;
+      const feetBelowTop = feetY > obsTop;
 
-      if (xOverlap && notAbove) {
+      if (xOverlap && feetBelowTop) {
         obs.cleared = true;
         return obs;
       }
@@ -216,7 +256,7 @@ const Obstacles = (() => {
     return null;
   }
 
-  return { init, reset, render, checkPlayerCollision };
+  return { init, reset, render, checkPlayerCollision, getActivePositions };
 })();
 
 // Export for module environments

@@ -172,7 +172,7 @@ const Choices = (() => {
         const shuffled = shuffle(data);
 
         selectedQuestions = shuffled.slice(0, 5).map((q, idx) => {
-            const targetX = questionEvents[idx] ? questionEvents[idx].worldX : (800 + idx * 450);
+            const targetX = questionEvents[idx] ? questionEvents[idx].worldX : (1300 + idx * 1100);
             return {
                 ...q,
                 worldX: targetX,
@@ -228,6 +228,7 @@ const Choices = (() => {
             }
         }
         ctx.fillText(line, x, ty);
+        return Math.round((ty - y) / lineH) + 1;   // number of lines drawn
     }
 
     // ---- Scaled Pixel Art Choice Icons ----
@@ -477,49 +478,79 @@ const Choices = (() => {
      * Render the 5-second moral takeaway banner while running.
      * Stays on screen for 150 frames (5 seconds at 30fps).
      */
+    /**
+     * Centred "lesson" card shown after a correct answer. The game is paused
+     * while it is up (see Game: state 'moral_banner'), so players stop and read.
+     */
     function renderMoralBanner(ctx, cp, moralTimer) {
-        if (!cp || moralTimer >= 150) return false;
+        const total = CONFIG.FEEDBACK_FRAMES;
+        if (!cp || moralTimer >= total) return false;
 
         let alpha = 1.0;
-        if (moralTimer < 15) {
-            alpha = moralTimer / 15;
-        } else if (moralTimer > 135) {
-            alpha = (150 - moralTimer) / 15;
+        if (moralTimer < 10) {
+            alpha = moralTimer / 10;
+        } else if (moralTimer > total - 10) {
+            alpha = (total - moralTimer) / 10;
         }
+        alpha = Math.max(0, Math.min(1, alpha));
 
         ctx.save();
-        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
 
-        const bw = 780, bh = 80;
+        // Dim the paused game behind the card
+        ctx.globalAlpha = alpha * 0.6;
+        ctx.fillStyle = '#060A18';
+        ctx.fillRect(0, 0, CONFIG.WIDTH, CONFIG.HEIGHT);
+
+        ctx.globalAlpha = alpha;
+        const bw = 760, bh = 250;
         const bx = CONFIG.WIDTH / 2 - bw / 2;
-        const by = CONFIG.HEIGHT - bh - 18;
+        const by = CONFIG.HEIGHT / 2 - bh / 2;
+        const cx = CONFIG.WIDTH / 2;
 
-        // Outer glow & container
-        ctx.fillStyle = 'rgba(10, 16, 32, 0.94)';
+        // Card
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+        ctx.fillRect(bx + 6, by + 6, bw, bh);
+        ctx.fillStyle = '#0F172A';
         ctx.fillRect(bx, by, bw, bh);
-
-        // Golden borders
         ctx.fillStyle = '#00FF88';
-        ctx.fillRect(bx, by, bw, 3);
-        ctx.fillRect(bx, by + bh - 3, bw, 3);
+        ctx.fillRect(bx, by, bw, 4);
+        ctx.fillRect(bx, by + bh - 4, bw, 4);
+        ctx.fillRect(bx, by, 4, bh);
+        ctx.fillRect(bx + bw - 4, by, 4, bh);
+        ctx.fillStyle = '#FFD700';
+        [[bx - 3, by - 3], [bx + bw - 7, by - 3], [bx - 3, by + bh - 7], [bx + bw - 7, by + bh - 7]]
+            .forEach(([x, y]) => ctx.fillRect(x, y, 10, 10));
 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
 
-        // Header Pill
-        ctx.font = 'bold 13px monospace';
+        // Header
+        ctx.font = 'bold 20px monospace';
         ctx.fillStyle = '#00FF88';
-        ctx.fillText('✨ GREAT CHOICE! સાચો નિર્ણય! ✨', CONFIG.WIDTH / 2, by + 9);
+        ctx.fillText('✨ GREAT CHOICE!  સાચો નિર્ણય! ✨', cx, by + 22);
+        ctx.fillStyle = 'rgba(0, 255, 136, 0.35)';
+        ctx.fillRect(cx - 220, by + 54, 440, 2);
 
-        // English Moral
-        ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+        // English moral (wraps if long)
+        ctx.font = 'bold 26px "Segoe UI", Arial, sans-serif';
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(cp.moral, CONFIG.WIDTH / 2, by + 30);
+        const enLines = wrapText(ctx, cp.moral, cx, by + 74, bw - 80, 32);
 
-        // Gujarati Moral
-        ctx.font = '15px "Segoe UI", Arial, sans-serif';
+        // Gujarati moral
+        ctx.font = 'bold 23px "Segoe UI", Arial, sans-serif';
         ctx.fillStyle = '#FDE68A';
-        ctx.fillText(cp.moralGuj, CONFIG.WIDTH / 2, by + 53);
+        wrapText(ctx, cp.moralGuj, cx, by + 74 + Math.max(1, enLines) * 32 + 14, bw - 80, 30);
+
+        // Countdown bar: the run resumes when it empties
+        const barW = bw - 120, barX = cx - barW / 2, barY = by + bh - 34;
+        const left = Math.max(0, 1 - moralTimer / total);
+        ctx.fillStyle = '#1E293B';
+        ctx.fillRect(barX, barY, barW, 8);
+        ctx.fillStyle = '#00FF88';
+        ctx.fillRect(barX, barY, Math.round(barW * left), 8);
+        ctx.font = '12px monospace';
+        ctx.fillStyle = '#94A3B8';
+        ctx.fillText('Get ready to run...  તૈયાર રહો...', cx, barY + 12);
 
         ctx.restore();
         return true;

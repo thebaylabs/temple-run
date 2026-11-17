@@ -11,7 +11,7 @@
 // ============================================================
 const Player = (() => {
     // ---- state ----
-    let state       = 'running'; // running|jumping|celebrating|stumbling|climbing
+    let state       = 'running'; // idle|running|jumping|celebrating|stumbling|climbing
     let animFrame   = 0;
     let animTimer   = 0;
     let stateTimer  = 0;
@@ -27,7 +27,42 @@ const Player = (() => {
     // ---- natural eye blink ----
     let eyeTimer    = 0;
 
-    // ---- palette ----
+    // ---- sprite sheet (assets/character/character_sheet.png, 3168×1344) ----
+    // [x, y, w, h] of each pose inside the sheet. All poses share one scale:
+    // the idle pose (608 px tall) is drawn SPRITE_H px tall on screen.
+    const SPRITE_H = 96;
+    const SPRITE_SCALE = SPRITE_H / 608;
+    const FRAMES = {
+        idle:     [119,  408, 252, 608],
+        runA:     [488,  408, 357, 608],
+        runB:     [937,  421, 397, 595],
+        jumpUp:   [1399, 316, 344, 634],
+        jumpPeak: [1782, 263, 436, 568],
+        cheer:    [2270, 381, 409, 635],
+        hurt:     [2705, 434, 423, 582],
+    };
+
+    function getSprite(name) {
+        const r = FRAMES[name];
+        return Assets.sprite('CHAR_SHEET', r, r[3] * SPRITE_SCALE);
+    }
+
+    /** Which pose of the sheet matches the current state. */
+    function currentFrameName() {
+        if (jumping) {
+            const t = jumpTimer / CONFIG.JUMP_DURATION;
+            return (t < 0.3 || t > 0.82) ? 'jumpUp' : 'jumpPeak';
+        }
+        if (blinking && blinkTimer > CONFIG.BLINK_FRAMES - 24) return 'hurt';
+        switch (state) {
+            case 'idle':        return 'idle';
+            case 'celebrating': return 'cheer';
+            case 'stumbling':   return 'hurt';
+            default:            return (animFrame % 2 === 0) ? 'runA' : 'runB';
+        }
+    }
+
+    // ---- palette (fallback rectangle character) ----
     const C = {
         skin:        '#D4A574',
         hair:        '#1A1A1A',
@@ -74,7 +109,7 @@ const Player = (() => {
      */
     function getYOffset() {
         if (!jumping) return 0;
-        return -Math.sin((jumpTimer / 22) * Math.PI) * 130;
+        return -Math.sin((jumpTimer / CONFIG.JUMP_DURATION) * Math.PI) * CONFIG.JUMP_HEIGHT;
     }
 
     /** Whether the player is currently in the air. */
@@ -82,7 +117,7 @@ const Player = (() => {
 
     /** Start 90-frame invincibility with flicker. */
     function startBlink() {
-        blinkTimer = 90;
+        blinkTimer = CONFIG.BLINK_FRAMES;
         blinking   = true;
     }
 
@@ -106,18 +141,18 @@ const Player = (() => {
         // ---- jump arc ----
         if (jumping) {
             jumpTimer++;
-            if (jumpTimer >= 22) {
+            if (jumpTimer >= CONFIG.JUMP_DURATION) {
                 jumping   = false;
-                jumpTimer = 22; // clamp so getYOffset() = 0
+                jumpTimer = CONFIG.JUMP_DURATION; // clamp so getYOffset() = 0
                 if (state === 'jumping') setState('running');
             }
         }
 
         // ---- animation frame cycling ----
         if (state === 'running') {
-            if (animTimer % 5 === 0) animFrame = (animFrame + 1) % 4;
+            if (animTimer % 4 === 0) animFrame = (animFrame + 1) % 4;
         } else if (state === 'climbing') {
-            if (animTimer % 8 === 0) animFrame = (animFrame + 1) % 4;
+            if (animTimer % 6 === 0) animFrame = (animFrame + 1) % 4;
         } else {
             // other states don't need leg cycling; keep animFrame for reuse
         }
@@ -133,7 +168,7 @@ const Player = (() => {
         // ---- invincibility flicker: skip render on invisible frames ----
         if (blinking && blinkTimer > 0) {
             // every 6 frames toggle: frames 0-5 visible, 6-11 invisible, ...
-            const phase = Math.floor((90 - blinkTimer) / 6) % 2;
+            const phase = Math.floor((CONFIG.BLINK_FRAMES - blinkTimer) / 6) % 2;
             if (phase === 1) return; // invisible frame — skip entirely
         }
 
@@ -141,6 +176,23 @@ const Player = (() => {
         const yOffset = getYOffset();
         const fy = Math.round(groundY + yOffset); // feet Y
 
+        // ---- sprite-sheet character (used whenever the PNG has loaded) ----
+        const sprite = getSprite(currentFrameName());
+        if (sprite) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.fillRect(x - 6, groundY - 2, 52, 5);
+            let bounce = 0;
+            if (state === 'celebrating' && !jumping) {
+                bounce = Math.round(Math.abs(Math.sin(stateTimer * 0.28) * 9));
+            }
+            const cx = x + CONFIG.PLAYER_W / 2;
+            ctx.drawImage(sprite, Math.round(cx - sprite.width / 2), fy - sprite.height - bounce + 2);
+            ctx.restore();
+            return;
+        }
+
+        // ---- fallback: rectangle character ----
         ctx.save();
 
         // ---- state-driven context transforms ----

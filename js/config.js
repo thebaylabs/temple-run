@@ -1,23 +1,33 @@
 // ============================================================
 // CONFIG — Game constants, zone definitions & kiosk settings
-// V1: 960×540 canvas, auto-run with speed ramp, 5-zone 2700px world
+// V1.1: 960×540 canvas, faster auto-run, flat 6500px world,
+//       temple staircase finale (no slopes)
 // ============================================================
 const CONFIG = {
     // Canvas
     WIDTH: 960,
     HEIGHT: 540,
     GROUND_Y: 430,
-    PLAYER_X: 220,
+    PLAYER_X: 220,          // left edge of the player sprite on screen
+    PLAYER_W: 40,           // sprite centre = PLAYER_X + PLAYER_W / 2
 
-    // Auto-run speed ramp (index = questions answered so far, capped at last)
-    SPEEDS: [1.8, 2.2, 2.6, 3.0, 3.3, 3.5],
+    // Auto-run speed ramp in px/frame at 30 fps
+    // (index = questions answered so far, capped at last)
+    SPEEDS: [4.5, 5.0, 5.5, 6.0, 6.5, 7.0],
 
-    ROLLBACK_SPEED: 5.2,
-    ROLLBACK_DISTANCE: 120,
+    ROLLBACK_DISTANCE: 200,     // knocked back this far when a life is lost
+    WRONG_ANSWER_REGATE: 800,   // a missed question re-appears this far ahead
+    MIN_QUESTION_GAP: 500,      // minimum run-up before the next question
 
     // World
-    TOTAL_DISTANCE: 2700,
-    VICTORY_X: 2600,
+    TOTAL_DISTANCE: 6500,   // player stops here, in front of the temple
+    STAIRS_X: 6100,         // first stair riser
+    VICTORY_X: 6060,        // temple climb begins here (just before the first riser)
+    STAIR_STEPS: 4,
+    STAIR_STEP_W: 80,
+    STAIR_STEP_H: 26,
+    TEMPLE_X: 6560,         // left edge of the temple on the top platform
+    CLIMB_SPEED: 3,
 
     // Lives
     MAX_LIVES: 3,
@@ -28,12 +38,9 @@ const CONFIG = {
     FEEDBACK_FRAMES: 150,   // 5 s at 30 fps
     BLINK_FRAMES: 90,       // 3 s invincibility after losing a life
 
-    // Obstacles
-    DEMON_START_GAP: 480,
-
     // Jump
-    JUMP_HEIGHT: 130,       // canvas pixels
-    JUMP_DURATION: 22,      // frames
+    JUMP_HEIGHT: 140,       // canvas pixels
+    JUMP_DURATION: 26,      // frames
 
     // Kiosk auto-reset
     INACTIVITY_TIMEOUT_SECONDS: 40,
@@ -47,8 +54,8 @@ const CONFIG = {
             id: 0,
             name: 'Garden Gate',
             nameGuj: 'બાગ પ્રવેશ (Garden Gate)',
-            start: 0, end: 600,
-            skyTop: '#4A90C8', skyBottom: '#87CEEB',
+            start: 0, end: 1400,
+            skyTop: '#3F8FD0', skyBottom: '#A9DCF5',
             ground: '#4A7C34', groundDark: '#3A6A28',
             path: '#C4A060', pathDark: '#A48040',
             treeColor: '#2D5A1E',
@@ -58,8 +65,8 @@ const CONFIG = {
             id: 1,
             name: 'Flower Gardens',
             nameGuj: 'પુષ્પ વાટિકા (Flower Gardens)',
-            start: 600, end: 1200,
-            skyTop: '#4A90C8', skyBottom: '#98D8F0',
+            start: 1400, end: 2800,
+            skyTop: '#4A9AD8', skyBottom: '#B5E4F7',
             ground: '#3D8B37', groundDark: '#2D7B27',
             path: '#D4B070', pathDark: '#B49050',
             treeColor: '#1E5A1E',
@@ -69,8 +76,8 @@ const CONFIG = {
             id: 2,
             name: 'Water Features',
             nameGuj: 'જળ પ્રપાત (Water Fountains)',
-            start: 1200, end: 1800,
-            skyTop: '#3A80B8', skyBottom: '#7EC8E3',
+            start: 2800, end: 4200,
+            skyTop: '#3A86C4', skyBottom: '#9FD6EE',
             ground: '#5A8C5A', groundDark: '#4A7C4A',
             path: '#A0A0A0', pathDark: '#808080',
             waterColor: '#4AA8D8', waterLight: '#6BC8F0'
@@ -79,8 +86,8 @@ const CONFIG = {
             id: 3,
             name: 'Pillar Pathway',
             nameGuj: 'સ્તંભ પથ (Pillar Pathway)',
-            start: 1800, end: 2400,
-            skyTop: '#6A98C0', skyBottom: '#C8DDE8',
+            start: 4200, end: 5600,
+            skyTop: '#6F9CCB', skyBottom: '#F3DDBE',
             ground: '#C4A882', groundDark: '#B49872',
             path: '#E8D8C0', pathDark: '#D0C0A0',
             pillarColor: '#D4B896', pillarDark: '#B49876'
@@ -89,8 +96,8 @@ const CONFIG = {
             id: 4,
             name: 'Swaminarayan Mandir',
             nameGuj: 'શ્રી સ્વામિનારાયણ મંદિર',
-            start: 2400, end: 2700,
-            skyTop: '#C08040', skyBottom: '#FFE4B5',
+            start: 5600, end: 6500,
+            skyTop: '#D9783A', skyBottom: '#FFE2A8',
             ground: '#D4B896', groundDark: '#C4A886',
             path: '#F0E0D0', pathDark: '#E0D0C0',
             templeColor: '#E8C898', templeDark: '#C4A070'
@@ -98,25 +105,19 @@ const CONFIG = {
     ],
 
     // --------------------------------------------------------
-    // World events (obstacles, terrain, questions, stairs)
+    // World events (obstacles, questions, stairs) — flat ground
     // --------------------------------------------------------
     WORLD_EVENTS: [
-        { type: 'terrain_up',   worldX: 180,  height: 50, width: 200 },
-        { type: 'obstacle',     worldX: 420,  id: 'instagram' },
-        { type: 'terrain_down', worldX: 620,  height: 50, width: 200 },
-        { type: 'question',     worldX: 800  },
-        { type: 'obstacle',     worldX: 1000, id: 'tiktok' },
-        { type: 'terrain_up',   worldX: 1150, height: 50, width: 200 },
-        { type: 'question',     worldX: 1350 },
-        { type: 'terrain_down', worldX: 1500, height: 50, width: 200 },
-        { type: 'obstacle',     worldX: 1680, id: 'bottle' },
-        { type: 'question',     worldX: 1900 },
-        { type: 'terrain_up',   worldX: 2050, height: 50, width: 200 },
-        { type: 'question',     worldX: 2200 },
-        { type: 'terrain_down', worldX: 2350, height: 50, width: 200 },
-        { type: 'obstacle',     worldX: 2420, id: 'cigarette' },
-        { type: 'question',     worldX: 2550 },
-        { type: 'stairs',       worldX: 2620 }
+        { type: 'obstacle', worldX: 700,  id: 'instagram' },
+        { type: 'question', worldX: 1300 },
+        { type: 'obstacle', worldX: 2000, id: 'tiktok' },
+        { type: 'question', worldX: 2600 },
+        { type: 'obstacle', worldX: 3300, id: 'bottle' },
+        { type: 'question', worldX: 3900 },
+        { type: 'obstacle', worldX: 4500, id: 'cigarette' },
+        { type: 'question', worldX: 5000 },
+        { type: 'question', worldX: 5700 },
+        { type: 'stairs',   worldX: 6100 }
     ],
 
     // --------------------------------------------------------
@@ -124,10 +125,7 @@ const CONFIG = {
     // --------------------------------------------------------
 
     getZone(worldX) {
-        for (let i = CONFIG.ZONES.length - 1; i >= 0; i--) {
-            if (worldX >= CONFIG.ZONES[i].start) return CONFIG.ZONES[i];
-        }
-        return CONFIG.ZONES[0];
+        return CONFIG.ZONES[CONFIG.getZoneIndex(worldX)];
     },
 
     getZoneIndex(worldX) {
@@ -144,45 +142,15 @@ const CONFIG = {
     },
 
     /**
-     * Returns the canvas Y position of the ground at a given world X.
-     * terrain_up events raise the ground (lower canvas Y), terrain_down events
-     * return it. Offset is accumulated in event order and clamped to [GROUND_Y-200, GROUND_Y].
+     * Canvas Y of the ground under a point in the world.
+     * The world is flat; only the temple staircase rises, in hard steps.
+     * worldX here is the X of whatever is standing there (its centre).
      */
     getGroundY(worldX) {
-        const BASE = CONFIG.GROUND_Y;
-        let offset = 0; // negative = ground raised
-
-        for (const ev of CONFIG.WORLD_EVENTS) {
-            if (ev.worldX > worldX) break;
-
-            if (ev.type === 'terrain_up') {
-                const W = ev.worldX;
-                const H = ev.height;
-                const L = ev.width;
-                if (worldX < W + L) {
-                    // Inside the ramp: lerp from 0 to -H
-                    const t = (worldX - W) / L;
-                    offset += -H * t;
-                } else {
-                    // Past the ramp: fully raised
-                    offset += -H;
-                }
-            } else if (ev.type === 'terrain_down') {
-                const W = ev.worldX;
-                const H = ev.height;
-                const L = ev.width;
-                if (worldX < W + L) {
-                    // Inside the ramp down: lerp from 0 to +H (cancelling a prior up)
-                    const t = (worldX - W) / L;
-                    offset += H * t;
-                } else {
-                    offset += H;
-                }
-            }
-        }
-
-        const result = BASE + offset;
-        return Math.max(BASE - 200, Math.min(BASE, result));
+        const dx = worldX - CONFIG.STAIRS_X;
+        if (dx < 0) return CONFIG.GROUND_Y;
+        const step = Math.min(CONFIG.STAIR_STEPS, Math.floor(dx / CONFIG.STAIR_STEP_W) + 1);
+        return CONFIG.GROUND_Y - step * CONFIG.STAIR_STEP_H;
     },
 
     getBoothRuns() {
